@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from utils.holiday_utils import get_holiday
 
 
 # ---------------------------------------------------------
@@ -17,6 +19,10 @@ def load_roster(file_path: str) -> pd.DataFrame:
     df["DoW"] = df["DoW"].astype(str)
     return df
 
+
+# ---------------------------------------------------------
+# Selected-range metrics
+# ---------------------------------------------------------
 def compute_selected_metrics(df_role_filtered: pd.DataFrame) -> dict:
     """
     Metrics for the currently selected week range (slider).
@@ -24,7 +30,7 @@ def compute_selected_metrics(df_role_filtered: pd.DataFrame) -> dict:
     if df_role_filtered.empty:
         return {
             "weeks_in_view": 0,
-            "weeks_label": "No data",
+            "weeks_label": "No weeks selected",
             "total_hours_sel": 0.0,
             "total_wages_sel": 0.0,
         }
@@ -48,48 +54,110 @@ def compute_selected_metrics(df_role_filtered: pd.DataFrame) -> dict:
         "total_wages_sel": total_wages_sel,
     }
 
-def render_selected_kpis(sel_metrics: dict):
+
+# ---------------------------------------------------------
+# KPI card helper
+# ---------------------------------------------------------
+def kpi_card_html(title: str, value: str, subtitle: str | None = None, tone: str = "neutral") -> str:
+    """Shared HTML card component with soft tone colours."""
+    tone_styles = {
+        "neutral": {"bg": "#ffffff", "border": "#e5e7eb"},
+        "good": {"bg": "#e8f5e9", "border": "#c8e6c9"},
+        "warn": {"bg": "#fff8e1", "border": "#ffe0b2"},
+        "bad": {"bg": "#ffebee", "border": "#ffcdd2"},
+    }
+    style = tone_styles.get(tone, tone_styles["neutral"])
+
+    subtitle_html = (
+        f"<div style='font-size:12px;color:#6b7280;margin-top:4px;'>{subtitle}</div>"
+        if subtitle
+        else ""
+    )
+
+    return f"""
+    <div style="
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: {style['bg']};
+        border: 1px solid {style['border']};
+        color: #0f172a;
+        box-shadow: 0 3px 8px rgba(15, 23, 42, 0.06);
+        margin-bottom: 12px;
+        text-align: left;
+    ">
+        <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; opacity: 0.7;">
+            {title}
+        </div>
+        <div style="font-size: 22px; margin-top: 4px; font-weight: 700;">
+            {value}
+        </div>
+        {subtitle_html}
+    </div>
+    """
+
+
+# ---------------------------------------------------------
+# Selected weeks KPI cards
+# ---------------------------------------------------------
+def render_selected_kpis(sel_metrics: dict, day_focus: str = "All days"):
     st.markdown("#### Selected weeks summary")
 
     col1, col2, col3 = st.columns(3)
 
+    weeks_tone = "bad" if sel_metrics["weeks_in_view"] == 0 else "good"
+    hours_tone = "neutral" if sel_metrics["total_hours_sel"] > 0 else "bad"
+    wages_tone = hours_tone
+
     with col1:
         st.markdown(
-            info_card("Weeks in view", sel_metrics["weeks_label"]),
+            kpi_card_html(
+                "Weeks in view",
+                sel_metrics["weeks_label"],
+                subtitle=f"Day focus: {day_focus.lower()}",
+                tone=weeks_tone,
+            ),
             unsafe_allow_html=True,
         )
 
     with col2:
         st.markdown(
-            info_card(
+            kpi_card_html(
                 "Hours (selected weeks)",
                 f"{sel_metrics['total_hours_sel']:.1f}",
+                tone=hours_tone,
             ),
             unsafe_allow_html=True,
         )
 
     with col3:
         st.markdown(
-            info_card(
+            kpi_card_html(
                 "Wages (selected weeks)",
                 f"${sel_metrics['total_wages_sel']:,.2f}",
+                tone=wages_tone,
             ),
             unsafe_allow_html=True,
         )
-
 
 
 # ---------------------------------------------------------
 # Filters
 # ---------------------------------------------------------
 def render_filter_section(df: pd.DataFrame):
-    st.markdown("### Filters")
+    st.markdown("### TM selection & week range")
 
     all_roles = sorted(df["Role"].unique())
     all_weeks = sorted(df["WoY"].unique())
-    min_week, max_week = min(all_weeks), max(all_weeks)
+    min_week, max_week = int(min(all_weeks)), int(max(all_weeks))
     min_date = df["Date"].min()
     max_date = df["Date"].max()
+
+    # Default: last 12 weeks in the dataset
+    if len(all_weeks) >= 12:
+        default_start = int(all_weeks[-12])
+        default_end = int(all_weeks[-1])
+    else:
+        default_start, default_end = min_week, max_week
 
     col_role, col_weeks, col_period = st.columns([1.2, 1.4, 1.6])
 
@@ -99,9 +167,9 @@ def render_filter_section(df: pd.DataFrame):
     with col_weeks:
         week_range = st.slider(
             "Weeks of year",
-            min_value=int(min_week),
-            max_value=int(max_week),
-            value=(int(min_week), int(max_week)),
+            min_value=min_week,
+            max_value=max_week,
+            value=(default_start, default_end),  # 👈 last 12 weeks by default
             step=1,
         )
 
@@ -109,10 +177,60 @@ def render_filter_section(df: pd.DataFrame):
         st.caption(
             f"Roster period: **week {min_week}–{max_week}** "
             f"({len(all_weeks)} weeks), "
-            f"{min_date:%d %b %Y} – {max_date:%d %b %Y}"
+            f"{min_date:%d %b %Y} – {max_date:%d %b %Y}. "
+            f"Default view shows the last 12 weeks for the selected role."
         )
 
     return role_selected, week_range
+
+
+
+def render_selection_pills_roster(role_selected: str, week_range, day_focus: str):
+    """Small pills summarising current roster scenario."""
+    if week_range[0] == week_range[1]:
+        weeks_label = f"Week {week_range[0]}"
+    else:
+        n_weeks = week_range[1] - week_range[0] + 1
+        weeks_label = f"Weeks {week_range[0]}–{week_range[1]} (n={n_weeks})"
+
+    html = f"""
+    <div style="
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        margin-top:8px;
+        margin-bottom:6px;
+    ">
+        <div style="
+            padding:6px 12px;
+            border-radius:999px;
+            background:#f2f4ff;
+            font-size:12px;
+            color:#111827;
+        ">
+            <strong>Team member</strong> · {role_selected}
+        </div>
+        <div style="
+            padding:6px 12px;
+            border-radius:999px;
+            background:#f5f5f5;
+            font-size:12px;
+            color:#111827;
+        ">
+            <strong>Weeks</strong> · {weeks_label}
+        </div>
+        <div style="
+            padding:6px 12px;
+            border-radius:999px;
+            background:#e0f2fe;
+            font-size:12px;
+            color:#111827;
+        ">
+            <strong>Day focus</strong> · {day_focus}
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
@@ -122,6 +240,9 @@ def generate_role_dashboard(df_role: pd.DataFrame) -> pd.DataFrame:
     """
     df_role: already filtered to a single Role (and desired week range).
     Returns one row per week with Sunday–Saturday columns + Hours + Wages.
+
+    Date column is always the Sunday for that week.
+    Holidays / events (e.g. Christmas Day) are appended to the relevant day.
     """
     if df_role.empty:
         return pd.DataFrame()
@@ -133,26 +254,48 @@ def generate_role_dashboard(df_role: pd.DataFrame) -> pd.DataFrame:
     dashboard_rows = []
 
     for w in weeks:
-        week_data = df_role[df_role["WoY"] == w]
+        week_data = df_role[df_role["WoY"] == w].copy()
+        if week_data.empty:
+            continue
+
+        # Use any date in the week to find the canonical Sunday for that week
+        example_date = week_data["Date"].iloc[0]
+        week_start = example_date.to_period("W-SAT").start_time  # Sunday start
+
         row = {
             "Week of year": w,
-            "Date": week_data["Date"].min(),  # week start date
+            "Date": week_start,  # will be formatted later
         }
+
         hours_sum = 0.0
         wages_sum = 0.0
 
-        for day in days:
-            day_data = week_data[week_data["DoW"] == day]
+        for i, day in enumerate(days):
+            day_date = week_start + pd.Timedelta(days=i)
+
+            # All shifts on this calendar day
+            day_data = week_data[week_data["Date"].dt.date == day_date.date()]
+
+            # Event / holiday label (e.g. "Christmas Day")
+            event_name = get_holiday(day_date)
+
             if not day_data.empty:
-                # handle potential multiple shifts per day
+                # Handle possible multiple shifts per day
                 shifts = day_data.apply(
-                    lambda r: f"{r['Start Time']} to {r['End Time']}", axis=1
+                    lambda r: f"{r['Start Time']} to {r['End Time']}",
+                    axis=1,
                 )
-                row[day] = " / ".join(shifts.tolist())
+                cell_text = " / ".join(shifts.tolist())
                 hours_sum += day_data["Hours Worked"].sum()
                 wages_sum += day_data["Dollars"].sum()
             else:
-                row[day] = "Off"
+                cell_text = "Off"
+
+            # Append event name if there is one
+            if event_name:
+                cell_text = f"{cell_text} ({event_name})"
+
+            row[day] = cell_text
 
         row["Hours"] = hours_sum
         row["Wages"] = wages_sum
@@ -162,12 +305,13 @@ def generate_role_dashboard(df_role: pd.DataFrame) -> pd.DataFrame:
     return df_dashboard.reset_index(drop=True)
 
 
+
 # ---------------------------------------------------------
-# Metrics
+# Metrics for full roster period
 # ---------------------------------------------------------
 def compute_role_metrics(df_role_full: pd.DataFrame) -> dict:
     """
-    df_role_full: all roster data for the selected role (full 12-week period).
+    df_role_full: all roster data for the selected role (full roster period).
     """
     if df_role_full.empty:
         return {
@@ -214,50 +358,43 @@ def compute_role_metrics(df_role_full: pd.DataFrame) -> dict:
 
 
 # ---------------------------------------------------------
-# Info cards
+# Role overview cards
 # ---------------------------------------------------------
-def info_card(title: str, value: str) -> str:
-    return f"""
-    <div style="
-        padding: 18px;
-        border-radius: 12px;
-        background: #0F766E10;
-        border: 1px solid #0F766E40;
-        color: #0F172A;
-        box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
-        margin-bottom: 12px;
-        text-align: left;
-    ">
-        <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; opacity: 0.7;">
-            {title}
-        </div>
-        <div style="font-size: 22px; margin-top: 4px; font-weight: 700;">
-            {value}
-        </div>
-    </div>
-    """
-
-
 def render_info_cards(metrics: dict):
     col1, col2, col3 = st.columns(3)
 
+    # Tone for hours per week (very rough bands)
+    hpw = metrics["hours_per_week"]
+    if hpw == 0:
+        hpw_tone = "bad"
+    elif hpw < 10:
+        hpw_tone = "warn"
+    elif hpw <= 40:
+        hpw_tone = "good"
+    else:
+        hpw_tone = "warn"
+
     with col1:
         st.markdown(
-            info_card("Type", metrics["type_role"]), unsafe_allow_html=True
+            kpi_card_html("Type", metrics["type_role"], tone="neutral"),
+            unsafe_allow_html=True,
         )
         st.markdown(
-            info_card("Category", metrics["category_role"]), unsafe_allow_html=True
+            kpi_card_html("Category", metrics["category_role"], tone="neutral"),
+            unsafe_allow_html=True,
         )
 
     with col2:
         st.markdown(
-            info_card(
-                "Hours per week", f"{metrics['hours_per_week']:.2f}"
+            kpi_card_html(
+                "Hours per week",
+                f"{metrics['hours_per_week']:.2f}",
+                tone=hpw_tone,
             ),
             unsafe_allow_html=True,
         )
         st.markdown(
-            info_card(
+            kpi_card_html(
                 "Total wages (roster period)",
                 f"${metrics['total_wages']:,.2f}",
             ),
@@ -266,14 +403,14 @@ def render_info_cards(metrics: dict):
 
     with col3:
         st.markdown(
-            info_card(
+            kpi_card_html(
                 "12-week wages",
                 f"${metrics['wages_12_weeks']:,.2f}",
             ),
             unsafe_allow_html=True,
         )
         st.markdown(
-            info_card(
+            kpi_card_html(
                 "Annualised wages",
                 f"${metrics['annualised_wages']:,.2f}",
             ),
@@ -295,43 +432,94 @@ def render_roster_table(df_dashboard: pd.DataFrame):
         return
 
     df_display = df_dashboard.copy()
-    # Pretty date format
+
+    # Pretty date format – always the Sunday of that week
     df_display["Date"] = df_display["Date"].dt.strftime("%A, %d %B %Y")
 
     # Numeric formatting
     df_display["Hours"] = df_display["Hours"].round(1)
     df_display["Wages"] = df_display["Wages"].round(2)
 
-    styler = df_display.style.format(
-        {
-            "Hours": "{:.1f}",
-            "Wages": "${:,.2f}",
-        }
+    day_columns = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+    def style_shift_cell(val):
+        if isinstance(val, str):
+            # Holiday / event days first (contains "(Event name)")
+            if "(" in val and ")" in val:
+                return "background-color:#FEF3C7; color:#92400E;"  # soft amber
+            if val.strip().lower().startswith("off"):
+                return "background-color:#FEF2F2; color:#B91C1C;"  # pale red
+            if "to" in val:
+                return "background-color:#ECFDF5; color:#065F46;"  # pale green
+        return ""
+
+    styler = (
+        df_display.style
+        .format(
+            {
+                "Hours": "{:.1f}",
+                "Wages": "${:,.2f}",
+            }
+        )
+        .applymap(style_shift_cell, subset=day_columns)
     )
 
     st.dataframe(styler, use_container_width=True)
 
 
+
 def render_weekly_summary_chart(df_dashboard: pd.DataFrame):
+    """Combo chart: hours (bars, left axis) vs wages (line, right axis)."""
     if df_dashboard.empty:
         return
 
     df_chart = df_dashboard[["Week of year", "Hours", "Wages"]].copy()
     df_chart["Week of year"] = df_chart["Week of year"].astype(int)
 
-    fig = px.bar(
-        df_chart,
-        x="Week of year",
-        y=["Hours", "Wages"],
-        barmode="group",
-        labels={"value": "", "variable": "", "Week of year": "Week of year"},
-        title="Weekly hours and wages",
+    fig = go.Figure()
+
+    # Bars for hours
+    fig.add_trace(
+        go.Bar(
+            x=df_chart["Week of year"],
+            y=df_chart["Hours"],
+            name="Hours",
+            marker_color="#2563eb",
+            yaxis="y1",
+        )
     )
+
+    # Line for wages
+    fig.add_trace(
+        go.Scatter(
+            x=df_chart["Week of year"],
+            y=df_chart["Wages"],
+            name="Wages",
+            mode="lines+markers",
+            marker=dict(size=6),
+            line=dict(width=2),
+            yaxis="y2",
+        )
+    )
+
     fig.update_layout(
-        legend_title="",
-        margin=dict(l=10, r=10, t=40, b=10),
+        title="Weekly hours and wages",
+        xaxis=dict(title="Week of year"),
+        yaxis=dict(
+            title="Hours",
+            rangemode="tozero",
+        ),
+        yaxis2=dict(
+            title="Wages",
+            overlaying="y",
+            side="right",
+            rangemode="tozero",
+        ),
+        legend=dict(title="", orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=10, r=10, t=50, b=10),
     )
-    st.plotly_chart(fig, use_container_width=True)
+
+    st.plotly_chart(fig, use_container_width=True, key="roster_weekly_combo")
 
 
 # ---------------------------------------------------------
@@ -342,6 +530,7 @@ def render():
 
     st.header("Roster explorer")
 
+    # Filters (role + week range)
     role_selected, week_range = render_filter_section(df)
 
     # Full data for this role (for metrics / 12-week calc)
@@ -352,11 +541,21 @@ def render():
         df_role_full["WoY"].between(week_range[0], week_range[1])
     ].copy()
 
+    # Build weekly dashboard data and metrics
     df_dashboard = generate_role_dashboard(df_role_filtered)
     metrics = compute_role_metrics(df_role_full)
-
     selected_metrics = compute_selected_metrics(df_role_filtered)
 
+    # --------------------------------------------------
+    # 1. SHOW ROSTER TABLE FIRST – “When am I working?”
+    # --------------------------------------------------
+    st.markdown("---")
+    render_roster_table(df_dashboard)
+
+    # --------------------------------------------------
+    # 2. SUMMARY CARDS + SELECTED-WEEKS METRICS
+    # --------------------------------------------------
+    st.markdown("---")
     st.markdown("### Role overview")
     render_info_cards(metrics)
 
@@ -370,8 +569,9 @@ def render():
 
     render_selected_kpis(selected_metrics)
 
-    st.markdown("---")
-    render_roster_table(df_dashboard)
-
+    # --------------------------------------------------
+    # 3. Weekly hours & wages combo chart (optional)
+    # --------------------------------------------------
     st.markdown("---")
     render_weekly_summary_chart(df_dashboard)
+

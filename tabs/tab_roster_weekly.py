@@ -305,7 +305,7 @@ def render():
             # Thinner, clean bars
             fig_tl.update_traces(marker_line_width=0, opacity=0.95)
 
-            st.plotly_chart(fig_tl, use_container_width=True)
+            st.plotly_chart(fig_tl, width='stretch')
 
     # -----------------------------------------------------
     # Coverage bar chart (required vs supplied by day)
@@ -344,7 +344,7 @@ def render():
         legend_title="",
         margin=dict(l=10, r=10, t=10, b=0),
     )
-    st.plotly_chart(fig_cov, use_container_width=True)
+    st.plotly_chart(fig_cov, width='stretch')
 
     # -----------------------------------------------------
     # Per-day KPI table
@@ -362,7 +362,7 @@ def render():
         ],
     }
     kpi_df = pd.DataFrame(kpi_data).set_index("Day")
-    st.dataframe(kpi_df, use_container_width=True)
+    st.dataframe(kpi_df, width='stretch')
 
     # -----------------------------------------------------
     # Foundation & flexible schedule tables
@@ -371,7 +371,7 @@ def render():
     styled_df = df_foundation_schedule.style.applymap(
         highlight_positive, subset=WEEK_DAYS
     )
-    st.dataframe(styled_df, use_container_width=True)
+    st.dataframe(styled_df, width='stretch')
 
     st.subheader("Flexible schedule (hours per TM per day)")
     df_flex_schedule = df_foundation_schedule[["Role"] + WEEK_DAYS].copy()
@@ -391,7 +391,7 @@ def render():
     styled_flex_df = df_flex_schedule.style.applymap(
         lambda v: highlight_positive(v, color="#FFD000"), subset=WEEK_DAYS
     )
-    st.dataframe(styled_flex_df, use_container_width=True)
+    st.dataframe(styled_flex_df, width='stretch')
 
     # -----------------------------------------------------
     # Narrative insights
