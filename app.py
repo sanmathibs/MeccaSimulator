@@ -18,7 +18,7 @@ from tabs import (
 
 
 st.set_page_config(
-    page_title="Mecca Sim – Demand forecasting & labour scheduling",
+    page_title="Mecca Simulator - with live forecasting",
     page_icon="🚀",
     layout="wide",
 )
