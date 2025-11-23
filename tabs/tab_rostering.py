@@ -8,6 +8,37 @@ from utils.holiday_utils import get_holiday
 # ---------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# Paid holiday helpers
+# ---------------------------------------------------------
+PAID_HOLIDAY_LABELS = {"Christmas", "New Years"}
+
+
+def normalise_paid_holiday(event_name: str | None) -> str | None:
+    """
+    Map raw holiday names from get_holiday(...) to the labels we want to display
+    for *paid* shutdown days only.
+
+    Only returns a value for paid holidays (e.g. Christmas, New Years).
+    All other events (e.g. Black Friday) return None.
+    """
+    if not event_name:
+        return None
+
+    name = event_name.strip().lower()
+    # normalise separators
+    name = name.replace("_", " ").replace("-", " ")
+    name = " ".join(name.split())
+
+    if "christmas" in name:
+        return "Christmas"
+    if "new year" in name:
+        return "New Years"
+
+    # Not a paid holiday
+    return None
+
 def load_roster(file_path: str) -> pd.DataFrame:
     df = pd.read_excel(file_path)
 
@@ -242,7 +273,12 @@ def generate_role_dashboard(df_role: pd.DataFrame) -> pd.DataFrame:
     Returns one row per week with Sunday–Saturday columns + Hours + Wages.
 
     Date column is always the Sunday for that week.
-    Holidays / events (e.g. Christmas Day) are appended to the relevant day.
+
+    Rules for special days:
+      - Only show a yellow holiday label when:
+          * The store is shut (no actual shift times), AND
+          * The event is a *paid* holiday (Christmas / New Years).
+      - Unpaid events (e.g. Black Friday) just show as a normal "Off" day.
     """
     if df_role.empty:
         return pd.DataFrame()
@@ -273,27 +309,43 @@ def generate_role_dashboard(df_role: pd.DataFrame) -> pd.DataFrame:
         for i, day in enumerate(days):
             day_date = week_start + pd.Timedelta(days=i)
 
-            # All shifts on this calendar day
+            # All roster entries on this calendar day
             day_data = week_data[week_data["Date"].dt.date == day_date.date()]
 
-            # Event / holiday label (e.g. "Christmas Day")
-            event_name = get_holiday(day_date)
+            # Normalise only PAID holidays (Christmas / New Years)
+            raw_event = get_holiday(day_date)
+            paid_label = normalise_paid_holiday(raw_event)
 
             if not day_data.empty:
-                # Handle possible multiple shifts per day
-                shifts = day_data.apply(
-                    lambda r: f"{r['Start Time']} to {r['End Time']}",
-                    axis=1,
-                )
-                cell_text = " / ".join(shifts.tolist())
+                # Always include wages / hours even if it's a paid shutdown
                 hours_sum += day_data["Hours Worked"].sum()
                 wages_sum += day_data["Dollars"].sum()
-            else:
-                cell_text = "Off"
 
-            # Append event name if there is one
-            if event_name:
-                cell_text = f"{cell_text} ({event_name})"
+                # Decide if there is any "real" shift (operation not shut)
+                has_shift = False
+                if {"Start Time", "End Time"}.issubset(day_data.columns):
+                    has_shift = (
+                        day_data["Start Time"].notna().any()
+                        or day_data["End Time"].notna().any()
+                    )
+                else:
+                    # Fallback: treat as shift if there are positive hours
+                    has_shift = day_data["Hours Worked"].fillna(0).gt(0).any()
+
+                if has_shift:
+                    # Normal worked day – show shift times (green)
+                    shifts = day_data.apply(
+                        lambda r: f"{r['Start Time']} to {r['End Time']}",
+                        axis=1,
+                    )
+                    cell_text = " / ".join(shifts.tolist())
+                else:
+                    # No actual shift times => shutdown day
+                    # Only show a label if this is a PAID holiday
+                    cell_text = paid_label if paid_label else "Off"
+            else:
+                # No roster row at all for this date
+                cell_text = paid_label if paid_label else "Off"
 
             row[day] = cell_text
 
@@ -303,6 +355,7 @@ def generate_role_dashboard(df_role: pd.DataFrame) -> pd.DataFrame:
 
     df_dashboard = pd.DataFrame(dashboard_rows).sort_values("Week of year")
     return df_dashboard.reset_index(drop=True)
+
 
 
 
@@ -444,13 +497,20 @@ def render_roster_table(df_dashboard: pd.DataFrame):
 
     def style_shift_cell(val):
         if isinstance(val, str):
-            # Holiday / event days first (contains "(Event name)")
-            if "(" in val and ")" in val:
-                return "background-color:#FEF3C7; color:#92400E;"  # soft amber
-            if val.strip().lower().startswith("off"):
-                return "background-color:#FEF2F2; color:#B91C1C;"  # pale red
-            if "to" in val:
-                return "background-color:#ECFDF5; color:#065F46;"  # pale green
+            text = val.strip()
+
+            # Paid shutdown holiday (Christmas / New Years)
+            if text in PAID_HOLIDAY_LABELS:
+                return "background-color:#FEF3C7; color:#92400E; font-weight:600;"
+
+            # Standard off day
+            if text.lower().startswith("off"):
+                return "background-color:#FEF2F2; color:#B91C1C;"
+
+            # Worked shift
+            if "to" in text:
+                return "background-color:#ECFDF5; color:#065F46;"
+
         return ""
 
     styler = (

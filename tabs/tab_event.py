@@ -14,17 +14,24 @@ def load_data(file_path="data/all_stores.xlsx", window=10):
     df[cols] = df[cols].apply(pd.to_numeric, errors="coerce")
     df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d", errors="coerce")
 
-    df['Event'] = df['Date'].apply(get_holiday)
-    
+    df["Event"] = df["Date"].apply(get_holiday).astype("object")
 
-    event_rows = df[df['Event'].notna()]
-    df['EventWindow'] = np.nan
-    for idx, row in event_rows.iterrows():
-        start = row['Date'] - pd.Timedelta(days=window)
-        end = row['Date'] + pd.Timedelta(days=window)
-        df.loc[(df['Date'] >= start) & (df['Date'] <= end), 'EventWindow'] = row['Event']
-    
+    event_rows = df[df["Event"].notna()].copy()
+
+    # Make EventWindow an object column (so strings like "Black_Friday" are safe)
+    df["EventWindow"] = pd.Series([None] * len(df), index=df.index, dtype="object")
+
+    for _, row in event_rows.iterrows():
+        start = row["Date"] - pd.Timedelta(days=window)
+        end = row["Date"] + pd.Timedelta(days=window)
+        df.loc[
+            (df["Date"] >= start) & (df["Date"] <= end),
+            "EventWindow",
+        ] = row["Event"]
+
     return df
+
+
 # --- Event Filter ---
 def select_stores_and_events(df):
 

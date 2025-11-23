@@ -1,18 +1,17 @@
 # tabs/tab_ai_insight.py
 import os
 import re
+import json
 from collections import Counter
 from glob import glob
 from typing import Dict, List
 from wordcloud import WordCloud
+
 import matplotlib.pyplot as plt
-
-
-import json
-
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 import streamlit as st
 
@@ -31,9 +30,7 @@ def load_store_coverage():
             data = json.load(f)
 
         df = pd.json_normalize(data["Data"])
-        df["Store"] = (
-            os.path.basename(path).replace(".json", "").replace("_", " ")
-        )
+        df["Store"] = os.path.basename(path).replace(".json", "").replace("_", " ")
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
         cards.append(
@@ -50,6 +47,9 @@ def load_store_coverage():
 
 def render_data_pills():
     cards = load_store_coverage()
+    if not cards:
+        return
+
     html = "<div class='ai-pill-bar'>"
     for c in cards:
         html += (
@@ -69,18 +69,6 @@ def render_data_pills():
 def load_review_summary() -> pd.DataFrame:
     """
     Aggregate Google-style review JSON (list of reviews) into one row per store.
-
-    Expected per-file structure (simplified):
-    [
-      {
-        "title": "MECCA Double Bay",
-        "stars": 5,
-        "reviewsCount": 59,
-        "totalScore": 4.5,
-        ...
-      },
-      ...
-    ]
     """
     rows: List[Dict] = []
 
@@ -152,14 +140,11 @@ def render_review_pills():
     if df.empty:
         return
 
-    # 🔒 This tab is Mecca-only
+    # Mecca only in this tab
     df = df[df["brand"] == "Mecca"].copy()
     if df.empty:
         return
 
-    st.markdown("#### 🗣️ Customer pulse (Mecca stores)")
-
-    # Order by location for a nice strip
     df = df.sort_values(["location"], ascending=[True])
 
     html = "<div class='ai-review-bar'>"
@@ -196,11 +181,12 @@ def render_review_pills():
     st.markdown(html, unsafe_allow_html=True)
 
 
-
 # =========================
 #  Shared helpers
 # =========================
 def _render_view_suggestion(view_info: Dict):
+    if not view_info:
+        return
     st.markdown(
         f"""
         <div class="ai-view-suggestion">
@@ -227,7 +213,6 @@ def _render_customer_evidence(snippets: List[Dict]):
             st.markdown(f"- {s['text']}")
 
 
-
 # =========================
 #  Review + ops helper data
 # =========================
@@ -236,9 +221,6 @@ def load_reviews_long() -> pd.DataFrame:
     """
     Load all Google-review style JSON files from data/Reviews (and data/reviews)
     into one long dataframe.
-
-    Expected fields (as in your example):
-    reviewId, text, stars, name, publishedAtDate, title, totalScore, ...
     """
     paths = glob("data/Reviews/*.json") + glob("data/reviews/*.json")
     frames = []
@@ -365,12 +347,12 @@ def build_keyword_df(
     """
     Cheap 'word map' builder: top tokens for given sentiment bucket.
     """
-    ser = df_reviews["text"].dropna().astype(str)
-
     if sentiment_filter:
         ser = df_reviews.loc[
             df_reviews["sentiment"] == sentiment_filter, "text"
         ].dropna().astype(str)
+    else:
+        ser = df_reviews["text"].dropna().astype(str)
 
     counter = Counter()
     for txt in ser:
@@ -410,7 +392,6 @@ def cx_kpi_card(
     """
 
 
-
 def cx_store_card(
     store: str,
     rating: float,
@@ -431,96 +412,70 @@ def cx_store_card(
     """
 
 
-# -------------------------
-#  Helpers for CX view
-# -------------------------
-def pick_sample_reviews(
-    df_store: pd.DataFrame,
-    sentiment: str,
-    max_reviews: int = 3,
-    min_words: int = 8,
-) -> list[str]:
-    """
-    Pick up to `max_reviews` unique review texts for a store & sentiment,
-    keeping only reviews that look like full sentences (min_words).
-    """
-    ser = (
-        df_store.loc[df_store["sentiment"] == sentiment, "text"]
-        .dropna()
-        .astype(str)
-    )
-
-    # Only keep "real" sentences
-    ser = ser[ser.str.split().str.len() >= min_words]
-
-    # Drop exact duplicates to avoid repetition
-    ser = ser.drop_duplicates()
-
-    return ser.head(max_reviews).tolist()
-
-
-def render_wordcloud_for_subset(
-    df_subset: pd.DataFrame,
-    sentiment_filter: str,
-    key: str,
-    max_words: int = 50,
-):
-    """Render a word cloud image for the given subset + sentiment."""
-    df_subset = df_subset.copy()
-    if sentiment_filter:
-        df_subset = df_subset[df_subset["sentiment"] == sentiment_filter]
-
-    texts = df_subset["text"].dropna().astype(str).tolist()
-    texts = [t for t in texts if len(t.strip()) > 20]  # at least a short sentence
-
-    if not texts:
-        st.caption("Not enough text to build a word cloud.")
-        return
-
-    full_text = " ".join(texts)
-    wc = WordCloud(
-        width=400,
-        height=300,
-        background_color= "White",
-        stopwords=STOPWORDS,
-        max_words=max_words,
-        collocations=False,
-    ).generate(full_text)
-
-    st.image(wc.to_image(), width='content')
-
-
-def select_sample_reviews(df_store: pd.DataFrame, sentiment: str, n: int) -> pd.DataFrame:
-    """Pick up to n reasonably long reviews for a given sentiment."""
-    df = df_store[df_store["sentiment"] == sentiment].copy()
-    df["text"] = df["text"].astype(str)
-    # keep only reviews that are at least a sentence-ish
-    df = df[df["text"].str.len() >= 60]
-    # prioritise more recent & more extreme ratings
-    df = df.sort_values(
-        by=["publishedAtDate", "stars"],
-        ascending=[False, sentiment != "negative"],
-    )
-    return df.head(n)
-
-
 def highlight_keywords(text: str, keywords: set[str]) -> str:
-    """Highlight important tokens inside a review with <mark>."""
+    """Highlight important tokens inside a review with a styled span."""
     if not keywords:
         return text
 
-    # only simple words, avoid regex surprises
-    safe_keywords = [re.escape(k) for k in keywords if len(k) > 2]
-    if not safe_keywords:
+    escaped = [re.escape(k) for k in sorted(keywords, key=len, reverse=True) if len(k) > 2]
+    if not escaped:
         return text
 
-    pattern = r"\\b(" + "|".join(safe_keywords) + r")\\b"
+    pattern = r"\b(" + "|".join(escaped) + r")\b"
+    return re.sub(
+        pattern,
+        r"<span class='cx-keyword'>\1</span>",
+        text,
+        flags=re.IGNORECASE,
+    )
 
-    def _repl(match):
-        return f"<mark>{match.group(0)}</mark>"
 
-    return re.sub(pattern, _repl, text, flags=re.IGNORECASE)
+def compute_cx_index(row: pd.Series) -> float:
+    """
+    Simple CX health index 0–100 combining rating + sentiment mix.
+    Tuned just for storytelling, not for hardcore benchmarking.
+    """
+    rating_term = (row["avg_rating"] / 5.0) * 50  # up to 50 pts
+    pos_term = (row["pos_share"] / 100.0) * 35    # up to 35 pts
+    neg_term = (row["neg_share"] / 100.0) * 15    # up to 15 pts penalty
+    idx = rating_term + pos_term - neg_term
+    return float(np.clip(idx, 0, 100))
 
+
+# -------------------------
+#  Wordcloud helper
+# -------------------------
+def draw_wordcloud(series: pd.Series, title: str, key: str):
+    """Compact, more vivid word-cloud that still fits nicely with other charts."""
+    text_blob = " ".join(series.dropna().astype(str).tolist())
+    if not text_blob.strip():
+        st.caption(f"Not enough text to build a word cloud for {title}.")
+        return
+
+    wc = WordCloud(
+        width=520,
+        height=260,
+        background_color="#ffffff",   # crisp white background
+        stopwords=STOPWORDS,
+        max_words=70,                 # enough variety but not messy
+        collocations=False,
+        prefer_horizontal=0.9,
+        relative_scaling=0.5,
+        max_font_size=52,
+        colormap="PuBuGn",            # soft blue/green gradient – higher contrast
+    ).generate(text_blob)
+
+    fig, ax = plt.subplots(figsize=(4.8, 2.4), dpi=110)
+    ax.imshow(wc, interpolation="bilinear")
+    ax.axis("off")
+    ax.set_title(title, fontsize=13, pad=8, fontweight="600")
+    st.pyplot(fig, clear_figure=True, use_container_width=True)
+
+
+
+# =========================
+#  Customer review intelligence tab
+# =========================
 def render_review_intelligence():
     """
     Deep-dive Mecca customer reviews: filters + word clouds + sentiment dashboard + AI Q&A.
@@ -542,45 +497,6 @@ def render_review_intelligence():
     df_all = df_all[df_all["n_words"] >= 8]  # only real sentences
     df_all = df_all.drop_duplicates(subset=["store_label", "text"])
 
-    # helper: nicer wordcloud with fewer words
-    def draw_wordcloud(series: pd.Series, title: str, key: str):
-        """Compact, softer word-cloud so it doesn't dwarf other charts."""
-        text_blob = " ".join(series.dropna().astype(str).tolist())
-        if not text_blob.strip():
-            st.caption(f"Not enough text to build a word cloud for {title}.")
-            return
-
-        wc = WordCloud(
-            width=480,
-            height=220,                # much shorter canvas
-            background_color="#f8fafc",# soft blue-grey background
-            stopwords=STOPWORDS,
-            max_words=60,              # fewer words => less busy
-            collocations=False,
-            prefer_horizontal=0.95,
-            relative_scaling=0.4,
-            max_font_size=42,          # cap biggest words
-        ).generate(text_blob)
-
-        fig, ax = plt.subplots(figsize=(3.6, 1.8), dpi=100)  # small physical size
-        ax.imshow(wc, interpolation="bilinear")
-        ax.axis("off")
-        ax.set_title(title, fontsize=12, pad=6)
-        st.pyplot(fig, clear_figure=True, width='content')
-
-    # helper: highlight keywords inside reviews
-    def highlight_keywords(text: str, keywords: set[str]) -> str:
-        if not keywords:
-            return text
-        escaped = [re.escape(k) for k in sorted(keywords, key=len, reverse=True)]
-        pattern = r"\b(" + "|".join(escaped) + r")\b"
-        return re.sub(
-            pattern,
-            r"<span class='cx-keyword'>\1</span>",
-            text,
-            flags=re.IGNORECASE,
-        )
-
     # ------------------------------------------------------------------ layout
     st.markdown("### 🗣️ Customer review intelligence")
     st.caption(
@@ -588,7 +504,6 @@ def render_review_intelligence():
         "surface the key customer themes."
     )
 
-    # You can still show the review pills strip if you like
     render_review_pills()
 
     # ----------------------------- filters ------------------------------------
@@ -598,7 +513,7 @@ def render_review_intelligence():
     default_focus = all_labels[:3]
 
     stores_in_focus = col_stores.multiselect(
-        "Mecca stores in focus (max 3 used for comparison)",
+        "Mecca stores in focus",
         options=all_labels,
         default=default_focus,
         key="cx_mecca_store_focus",
@@ -637,6 +552,7 @@ def render_review_intelligence():
     mode = col_mode.radio(
         "Mode",
         options=["Single store", "Compare stores"],
+        index=1,
         horizontal=True,
         key="cx_mecca_mode",
     )
@@ -652,7 +568,7 @@ def render_review_intelligence():
         compare_stores = [store_a]
     else:
         compare_stores = col_store_sel.multiselect(
-            "Stores to compare (up to 3)",
+            "Stores to compare",
             options=stores_in_focus,
             default=stores_in_focus,
             key="cx_mecca_store_compare",
@@ -671,7 +587,6 @@ def render_review_intelligence():
     pos_share = (df_cmp["sentiment"] == "positive").mean() * 100
     neg_share = (df_cmp["sentiment"] == "negative").mean() * 100
 
-    # choose colour variants for KPIs
     rating_variant = "rating-high" if avg_rating >= 4.5 else "rating-mid"
     pos_variant = "positive" if pos_share >= 80 else None
     neg_variant = "negative" if neg_share >= 15 else None
@@ -708,6 +623,27 @@ def render_review_intelligence():
             unsafe_allow_html=True,
         )
 
+    # Quick view summary
+    st.caption(
+        f"View summary: **{len(compare_stores)}** store(s) · "
+        f"**{n_reviews:,}** reviews · window: **{window.lower()}**"
+    )
+
+    # Global top themes chips for this view
+    global_kw = build_keyword_df(df_cmp, top_n=10)
+    if not global_kw.empty:
+        chips_html = "<div class='cx-top-words' style='margin-top:4px;'>"
+        for _, r in global_kw.iterrows():
+            token = r["token"]
+            cnt = int(r["count"])
+            chips_html += (
+                f"<span class='cx-top-word-chip'>{token}"
+                f"<span class='cx-top-word-count'>{cnt}</span></span>"
+            )
+        chips_html += "</div>"
+        st.markdown("##### 🔍 Top themes in this view")
+        st.markdown(chips_html, unsafe_allow_html=True)
+
     # ----------------------------- Store snapshot -----------------------------
     st.markdown("#### 🧾 Store comparison snapshot")
 
@@ -721,15 +657,24 @@ def render_review_intelligence():
         )
         .reset_index()
     )
+    snapshot["cx_index"] = snapshot.apply(compute_cx_index, axis=1)
 
     cols = st.columns(len(compare_stores))
     for store, col in zip(compare_stores, cols):
         row = snapshot[snapshot["store_label"] == store].iloc[0]
         subtitle = (
+            f"CX index {row['cx_index']:.0f}/100  ·  "
             f"{int(row['review_count']):,} reviews  ·  "
             f"{row['pos_share']:.1f}% positive  ·  {row['neg_share']:.1f}% negative"
         )
-        variant = "rating-high" if row["avg_rating"] >= 4.5 else "rating-mid"
+
+        if row["cx_index"] >= 80:
+            variant = "positive"
+        elif row["avg_rating"] >= 4.5:
+            variant = "rating-high"
+        else:
+            variant = "rating-mid"
+
         with col:
             st.markdown(
                 cx_kpi_card(
@@ -775,25 +720,25 @@ def render_review_intelligence():
         margin=dict(l=10, r=10, t=10, b=30),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    st.plotly_chart(fig_sent, width='content')
+    st.plotly_chart(fig_sent, use_container_width=True)
 
     # ----------------------------- Rating distribution ------------------------
     st.markdown("#### ⭐ Rating distribution by store")
 
     df_r = df_cmp[df_cmp["stars"].notna()].copy()
     if not df_r.empty:
-        df_r["star_bucket"] = (
-            df_r["stars"].round().clip(lower=1, upper=5).astype(int)
-        )
+        df_r["star_bucket"] = df_r["stars"].round().clip(lower=1, upper=5).astype(int)
 
         dist = (
             df_r.groupby(["store_label", "star_bucket"])
             .size()
             .reset_index(name="count")
         )
-        dist["pct"] = dist["count"] / dist.groupby("store_label")["count"].transform(
-            "sum"
-        ) * 100
+        dist["pct"] = (
+            dist["count"]
+            / dist.groupby("store_label")["count"].transform("sum")
+            * 100
+        )
         dist["star_bucket"] = dist["star_bucket"].astype(str)
 
         fig_dist = px.bar(
@@ -816,20 +761,38 @@ def render_review_intelligence():
             margin=dict(l=10, r=10, t=10, b=40),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
-        st.plotly_chart(fig_dist, width='stretch')
+        st.plotly_chart(fig_dist, use_container_width=True)
     else:
         st.info("No star ratings available to build a distribution.")
 
     # ----------------------------- Word clouds + top words --------------------
     st.markdown("#### ☁️ Word clouds by store")
 
+    wc_sentiment = st.radio(
+        "Word cloud focus",
+        options=["All sentiments", "Positive only", "Negative only"],
+        index=0,
+        horizontal=True,
+        key="cx_wc_focus",
+    )
+    wc_filter = None
+    if wc_sentiment == "Positive only":
+        wc_filter = "positive"
+    elif wc_sentiment == "Negative only":
+        wc_filter = "negative"
+
     wc_cols = st.columns(len(compare_stores))
     for store, col in zip(compare_stores, wc_cols):
         with col:
             df_store = df_cmp[df_cmp["store_label"] == store].copy()
 
-            # Top repeated words (all sentiments)
-            kw = build_keyword_df(df_store, top_n=6)
+            if wc_filter:
+                df_wc = df_store[df_store["sentiment"] == wc_filter]
+            else:
+                df_wc = df_store
+
+            # Top repeated words (respecting sentiment filter)
+            kw = build_keyword_df(df_wc, top_n=6)
             if not kw.empty:
                 chips_html = "<div class='cx-top-words'>"
                 for _, r in kw.iterrows():
@@ -842,7 +805,7 @@ def render_review_intelligence():
                 chips_html += "</div>"
                 st.markdown(chips_html, unsafe_allow_html=True)
 
-            draw_wordcloud(df_store["text"], title=store, key=f"wc_{store}")
+            draw_wordcloud(df_wc["text"], title=store, key=f"wc_{store}")
 
     # ----------------------------- Sample reviews -----------------------------
     st.markdown("#### ✏️ Sample reviews by store")
@@ -905,7 +868,10 @@ def render_review_intelligence():
         "Ask about anything you see in the review dashboards "
         "(staff, queues, events, returns, specific stores, etc.)",
         key="cx_mecca_free_q",
-        placeholder="E.g. What do reviews suggest about staffing levels at Parramatta vs Castle Towers?",
+        placeholder=(
+            "E.g. What do reviews suggest about staffing levels at "
+            "Parramatta vs Castle Towers?"
+        ),
     )
 
     if st.button("🚀 Ask Mecca AI (reviews + ops)", key="cx_mecca_free_btn") and q_free.strip():
@@ -939,10 +905,6 @@ def render_review_intelligence():
         """,
         unsafe_allow_html=True,
     )
-
-
-
-
 
 
 # =========================
@@ -1219,8 +1181,7 @@ def render_conversational_ai():
         st.markdown(last_answer)
 
         view_info = st.session_state.get("chat_last_view_info")
-        if view_info:
-            _render_view_suggestion(view_info)
+        _render_view_suggestion(view_info)
 
         snippets = st.session_state.get("chat_last_snippets") or []
         if snippets:
@@ -1258,8 +1219,8 @@ def render():
             color:#111827;
             white-space:nowrap;
         }
-        
-                /* KPI variants based on performance */
+
+        /* KPI variants based on performance */
         .cx-kpi-card.cx-kpi-rating-high {
             background: linear-gradient(135deg, #ecfdf5, #d1fae5);
             border-color: #67943633;
@@ -1276,7 +1237,7 @@ def render():
             background: linear-gradient(135deg, #fef2e2, #fee2e2);
             border-color: #a63c0633;
         }
-        
+
         /* Rating colour accents */
         .cx-kpi-card.cx-kpi-rating-high .cx-kpi-value {
             color: #31572c;
@@ -1284,7 +1245,7 @@ def render():
         .cx-kpi-card.cx-kpi-rating-mid .cx-kpi-value {
             color: #4f772d;
         }
-        
+
         /* Top repeated words chips (above word clouds) */
         .cx-top-words {
             display: flex;
@@ -1305,7 +1266,6 @@ def render():
             font-weight: 600;
             color: #003459;
         }
-
 
         .cx-kpi-card {
             padding: 12px 14px;
@@ -1402,51 +1362,88 @@ def render():
         .ai-review-bar {
             display:flex;
             flex-wrap:wrap;
-            gap:10px;
-            margin: 10px 0 14px 0;
+            gap:12px;
+            margin: 14px 0 18px 0;
         }
+        
         .ai-review-pill {
-            min-width:220px;
-            padding:10px 12px;
-            border-radius:12px;
-            background:linear-gradient(135deg,#fff7ed,#fefce8);
-            border:1px solid #fed7aa;
-            box-shadow:0 4px 8px rgba(248, 171, 104, 0.15);
+            flex: 1 1 260px;              /* stretch nicely across the row */
+            padding:14px 16px;
+            border-radius:16px;
+            background:linear-gradient(135deg,#fdf2ff,#eef2ff);
+            border:1px solid #e5e7eb;
+            box-shadow:0 6px 14px rgba(15,23,42,0.10);
             font-size:11px;
+            position:relative;
+            overflow:hidden;
         }
+        
+        .ai-review-pill::after {
+            content:"";
+            position:absolute;
+            inset:0;
+            border-radius:inherit;
+            border:1px solid rgba(255,255,255,0.7);
+            pointer-events:none;
+            mix-blend-mode:screen;
+        }
+        
         .ai-review-header {
             display:flex;
             align-items:center;
-            gap:6px;
-            margin-bottom:3px;
+            gap:8px;
+            margin-bottom:4px;
         }
+        
         .ai-review-badge {
-            padding:2px 7px;
+            padding:3px 9px;
             border-radius:999px;
             font-size:9px;
             text-transform:uppercase;
-            letter-spacing:0.03em;
+            letter-spacing:0.06em;
             color:#fff;
         }
+        
         .ai-review-badge-mecca {
-            background:#0f766e;
+            background:#0f766e;  /* keep Mecca teal brand */
         }
-        .ai-review-badge-comp {
-            background:#4b5563;
-        }
+        
         .ai-review-store {
             font-weight:600;
             color:#111827;
-        }
-        .ai-review-main {
             font-size:12px;
-            font-weight:600;
-            margin-bottom:1px;
         }
+        
+        .ai-review-main {
+            font-size:14px;
+            font-weight:700;
+            margin-bottom:2px;
+        }
+        
         .ai-review-extra {
             font-size:11px;
-            color:#6b7280;
+            color:#4b5563;
         }
+        
+        
+        /* Filter chips (st.multiselect tags) – light purple theme */
+        .stMultiSelect [data-baseweb="tag"] {
+            background-color:#e2d5f0!important;
+            border-radius:999px !important;
+            border:1px solid #E9D5FF !important;
+            color:#7b4dc4 !important;
+            font-size:16px !important;
+        }
+        
+        .stMultiSelect [data-baseweb="tag"] span {
+            color:#2e0b63 !important;
+        }
+        
+        .stMultiSelect [data-baseweb="tag"] svg {
+            fill:#743acf !important;
+        }
+
+
         </style>
         """,
         unsafe_allow_html=True,

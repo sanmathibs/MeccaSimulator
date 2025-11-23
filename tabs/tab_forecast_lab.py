@@ -286,7 +286,7 @@ def render():
     # --------------------------------------------------
     # Forecast controls: horizon + hyperparameters
     # --------------------------------------------------
-    st.subheader("1️⃣ Configure forecast")
+    st.subheader("Configure forecast settings")
 
     col_horizon, col_dates = st.columns([1.1, 1.6])
     col_qh, col_blend, col_save = st.columns([1.0, 1.0, 1.0])
@@ -396,7 +396,7 @@ def render():
 
     with run_col2:
         st.caption(
-            "Cached by store + horizon + settings so repeated runs are fast."
+            "Each run may take around 2-3 minutes depending on the data complexity!"
         )
 
     if run_clicked:

@@ -101,7 +101,11 @@ def render():
             "Weekday",
         ]
     ]
-    df_roster["Date"] = pd.to_datetime(df_roster["Date"]).dt.date
+    df_roster["Date"] = pd.to_datetime(
+        df_roster["Date"],
+        format="mixed",  # let pandas handle mixed formats explicitly
+        errors="coerce",
+    ).dt.date
 
     week_num_list = sorted(df_roster["WoY"].unique().tolist())
 
@@ -241,10 +245,12 @@ def render():
         # Build proper datetimes from Date + Start/End Time
         df_sched["StartDT"] = pd.to_datetime(
             df_sched["Date"].astype(str) + " " + df_sched["Start Time"].astype(str),
+            format="mixed",
             errors="coerce",
         )
         df_sched["EndDT"] = pd.to_datetime(
             df_sched["Date"].astype(str) + " " + df_sched["End Time"].astype(str),
+            format="mixed",
             errors="coerce",
         )
 
