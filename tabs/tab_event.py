@@ -105,7 +105,7 @@ def render_event_calendar_heatmap(df, selected_events=[], selected_stores=[]):
         title_x=0.5,
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 def render_event_uplift_analysis(df, selected_stores=[], selected_events=[], window=10):
@@ -184,7 +184,7 @@ def render_event_uplift_analysis(df, selected_stores=[], selected_events=[], win
 
     fig.update_layout(title_x=0.5)
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     # --- Table ---
     st.subheader("Detailed Event Uplift Table")

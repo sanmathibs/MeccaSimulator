@@ -308,6 +308,69 @@ def render():
             st.plotly_chart(fig_tl, width='stretch')
 
     # -----------------------------------------------------
+    # Pie charts: Category & Type by employee count and total hours
+    # -----------------------------------------------------
+    st.markdown("---")
+    st.subheader("Roster distribution by Type ")
+
+    if df_roster_selected.empty:
+        st.info("No roster data for pie charts.")
+    else:
+        base_color = "#0ea5e9"  # xanh dương chủ đạo
+
+    def make_shades(n, base_color):
+        import matplotlib.colors as mcolors
+        # tạo gradient sáng/thẫm từ màu base
+        c = mcolors.to_rgb(base_color)
+        shades = [
+            f"rgb({int(c[0] * 255 * (0.5 + 0.5 * i / n))}, {int(c[1] * 255 * (0.5 + 0.5 * i / n))}, {int(c[2] * 255 * (0.5 + 0.5 * i / n))})"
+            for i in range(n)]
+        return shades
+
+    # --- Pie 1: Employee count by Type ---
+    df_type_count = df_roster_selected.groupby("Type")["Role"].nunique().reset_index()
+    df_type_count.rename(columns={"Role": "EmployeeCount"}, inplace=True)
+    colors_type = make_shades(len(df_type_count), base_color)
+
+    fig_type_count = px.pie(
+        df_type_count,
+        names="Type",
+        values="EmployeeCount",
+        title="Number of Employee by Type",
+    )
+    fig_type_count.update_traces(
+        textposition='inside',
+        textinfo='percent+label',
+        marker=dict(colors=colors_type, line=dict(color='white', width=2)),
+        opacity=0.9,
+    )
+
+    # --- Pie 2: Total hours by Type ---
+    df_type_hours = df_roster_selected.groupby("Type")["Hours Worked"].sum().reset_index()
+    colors_type_hours = make_shades(len(df_type_hours), base_color)
+
+    fig_type_hours = px.pie(
+        df_type_hours,
+        names="Type",
+        values="Hours Worked",
+        title="Total hours by Type",
+    )
+    fig_type_hours.update_traces(
+        textposition='inside',
+        textinfo='percent+label+value',
+        marker=dict(colors=colors_type_hours, line=dict(color='white', width=2)),
+        opacity=0.9,
+    )
+
+    # --- Display ---
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.plotly_chart(fig_type_count, width='content')
+    with c2:
+        st.plotly_chart(fig_type_hours, width='content')
+
+    # -----------------------------------------------------
     # Coverage bar chart (required vs supplied by day)
     # -----------------------------------------------------
     st.subheader("Daily coverage – required vs rostered hours")
@@ -362,13 +425,13 @@ def render():
         ],
     }
     kpi_df = pd.DataFrame(kpi_data).set_index("Day")
-    st.dataframe(kpi_df, width='stretch')
+    st.dataframe(kpi_df, width='content')
 
     # -----------------------------------------------------
     # Foundation & flexible schedule tables
     # -----------------------------------------------------
     st.subheader("Foundation schedule (hours per TM per day)")
-    styled_df = df_foundation_schedule.style.applymap(
+    styled_df = df_foundation_schedule.style.map(
         highlight_positive, subset=WEEK_DAYS
     )
     st.dataframe(styled_df, width='stretch')
@@ -388,7 +451,7 @@ def render():
         if role in df_flex_schedule["Role"].values and dow in WEEK_DAYS:
             df_flex_schedule.loc[df_flex_schedule["Role"] == role, dow] += hours_worked
 
-    styled_flex_df = df_flex_schedule.style.applymap(
+    styled_flex_df = df_flex_schedule.style.map(
         lambda v: highlight_positive(v, color="#FFD000"), subset=WEEK_DAYS
     )
     st.dataframe(styled_flex_df, width='stretch')

@@ -11,7 +11,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from datetime import date, datetime, timedelta
 from dateutil import easter
-from sklearn.metrics import root_mean_squared_error
+from sklearn.metrics import mean_squared_error
 
 
 def get_week_of_year(dt_col: pd.Series):
@@ -146,7 +146,6 @@ class Predict:
         # -----------------------
         # Prepare training data
         # -----------------------
-        print(df_sales.head(10))
         df_sales["DayName"] = df_sales["Date"].dt.day_name()
         df_sales["Year"] = df_sales["Date"].dt.year
         df_sales["Month"] = df_sales["Date"].dt.month
@@ -226,8 +225,8 @@ class Predict:
             tscv = TimeSeriesSplit(n_splits=n_splits, test_size=horizon_days)
 
         param_grid = {
-            "n_estimators": [100, 200, 300, 400],
-            "max_depth": [None, 5, 10, 12, 15],
+            "n_estimators": [300, 400],
+            "max_depth": [None, 5, 10, 15],
             "min_samples_split": [2, 3, 4],
             "min_samples_leaf": [1, 2],
         }
@@ -258,17 +257,22 @@ class Predict:
         print(feature_importance_df)
 
         # replace sales forecast for shutdown events
+        # -- debug check index of df_sales where Is_Shutdown == 1
+        print(
+            "Indices where Is_Shutdown == 1:",
+            df_sales[df_sales["Is_Shutdown"] == 1].index.tolist(),
+        )
         historial_pred[df_sales[df_sales["Is_Shutdown"] == 1].index] = 0
         print(
             "Historical forecast RMSE:",
-            root_mean_squared_error(df_sales["Sales"], historial_pred),
+            mean_squared_error(df_sales["Sales"], historial_pred),
         )
         df_sales_ = df_sales[
             ["Date", "Sales", "DayName", "Year", "WoY", "SpecialEvent"]
         ].copy()
         df_sales_["SalesForecast"] = historial_pred
         df_sales_.rename(columns={"Sales": "SalesActual"}, inplace=True)
-        df_sales_.to_csv("df_sales_with_forecast.csv", index=False)
+        # df_sales_.to_csv("df_sales_with_forecast.csv", index=False)
 
         # Use the last split as validation for reporting
         val_indices = list(tscv.split(X))[-1][1]
@@ -276,7 +280,7 @@ class Predict:
         y_val = y.iloc[val_indices]
         y_val_pred = rf.predict(X_val)
 
-        rmse = root_mean_squared_error(y_val, y_val_pred)
+        rmse = mean_squared_error(y_val, y_val_pred)
         mae = np.mean(np.abs(y_val - y_val_pred))
         avg_actual = np.mean(y_val)
         rel_rmse = rmse / avg_actual * 100
@@ -355,10 +359,10 @@ class Predict:
         # df_sales.to_csv('df_sales.csv', index=False)
         future_pred = rf.predict(X_future)
         future_pred[df_forecast[df_forecast["Is_Shutdown"] == 1].index] = 0
-        df_forecast["SalesForecast"] = future_pred
-        df_sales["SalesForecast"] = historial_pred
-        df_final = pd.concat([df_sales, df_forecast], axis=0)
-        df_final.to_csv("df_final_SalesForecast.csv", index=False)
+        # df_forecast["SalesForecast"] = future_pred
+        # df_sales["SalesForecast"] = historial_pred
+        # df_final = pd.concat([df_sales, df_forecast], axis=0)
+        # df_final.to_csv("df_final_SalesForecast.csv", index=False)
         return future_pred, historial_pred
 
 
@@ -380,7 +384,8 @@ class QuantumForecast:
 
     def __init__(
         self,
-        input_json: str = "input.json",
+        input_json: str | None = None,
+        intput_df: pd.DataFrame | None = None,
         quantum_hours: float = 6.0,
         foundation_state: Dict[str, int] | None = None,
         forecast_start: pd.Timestamp | str = None,
@@ -391,6 +396,7 @@ class QuantumForecast:
         name: str = "Default",
     ) -> None:
         self.input_json = input_json
+        self._raw_input_df = intput_df
         self.quantum_hours = quantum_hours
         self.foundation_state = foundation_state or {
             "Monday": 3,
@@ -432,10 +438,16 @@ class QuantumForecast:
             print(*args)
 
     def _load_data(self) -> pd.DataFrame:
-        with open(self.input_json, "r") as f:
-            data = json.loads(f.read())
+        """Load sales and labour data from input JSON or provided DataFrame."""
+        if self._raw_input_df is not None:
+            self._log("Using provided input DataFrame.")
+            df_sales = self._raw_input_df.copy()
+            df_sales.reset_index(drop=True, inplace=True)
+        else:
+            with open(self.input_json, "r") as f:
+                data = json.loads(f.read())
+            df_sales = pd.json_normalize(data["Sale"])
 
-        df_sales = pd.json_normalize(data["Sale"])
         df_sales = df_sales[
             ["Date", "SalesActual", "SalesForecast", "HoursActual", "HoursForecast"]
         ].copy()
@@ -694,7 +706,6 @@ class QuantumForecast:
     def run(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         # Load and enrich
         df_sales = self._load_data()
-
         # Implied labour model
         reg_results, smooth_slope = self._fit_implied_labour(df_sales)
         if smooth_slope <= 1e-10:
@@ -705,6 +716,7 @@ class QuantumForecast:
         self.smooth_slope = smooth_slope
 
         # Sales bin
+        print("Calculating sales bin...", (self.quantum_hours, smooth_slope))
         sales_bin = int(round(self.quantum_hours / smooth_slope))
         self.sales_bin = sales_bin
         self._log("Sales bin (per quantum):", sales_bin)
@@ -715,7 +727,7 @@ class QuantumForecast:
 
         # Create a matrix of dow and state to the number of occurrences. Axis 0: State, Axis 1: DoW
         dow_state_matrix = pd.crosstab(df_sales["State"], df_sales["DayName"])
-        dow_state_matrix.to_csv(f"{self._safe_name}_dow_state_matrix.csv")
+        # dow_state_matrix.to_csv(f"{self._safe_name}_dow_state_matrix.csv")
         # - for each DoW, find 3 most common States, choose the smallest state among them as foundation state
         foundation_state = {}
         for dow in dow_state_matrix.columns:
@@ -749,7 +761,7 @@ class QuantumForecast:
         # Special events + Event names
         df_sales, event_class = self._mark_special_and_events(df_sales, sales_bin)
         self.event_class = event_class
-        df_sales.to_csv("df_sales_enriched.csv", index=False)
+        # df_sales.to_csv("df_sales_enriched.csv", index=False)
         # Three-factor from normal days
         annual_factor, woy_factor, dow_factor = self._three_factor(df_sales)
 
@@ -778,7 +790,7 @@ class QuantumForecast:
             .set_index("EventName")
         )
         self.hist_ev = hist_ev
-        hist_ev.to_csv(f"{self._safe_name}_special_events.csv")
+        # hist_ev.to_csv(f"{self._safe_name}_special_events.csv")
         if not hist_ev.empty:
             self._log("Repeated special events detected:")
             self._log(hist_ev[["YearsCount", "MeanState", "MeanDelta"]])
@@ -878,7 +890,7 @@ class QuantumForecast:
         )
 
         # Save outputs
-        df_forecast.to_csv(f"{self._safe_name}_quantum_forecast.csv", index=False)
+        # df_forecast.to_csv(f"{self._safe_name}_quantum_forecast.csv", index=False)
         df_forecast_result = df_forecast[
             [
                 "Date",
@@ -904,9 +916,10 @@ class QuantumForecast:
             + self.reg_results[r["DayName"]]["intercept_smoothed"],
             axis=1,
         ).round(1)
-        df_full.to_csv(
-            f"{self._safe_name}_full_quantum_forecast_with_history.csv", index=False
-        )
+        # df_full.to_csv(
+        #     f"{self._safe_name}_full_quantum_forecast_with_history.csv", index=False
+        # )
+        self.df_full_forecast = df_full
 
         output_data = {
             "Data": df_full.to_dict(orient="records"),
@@ -919,8 +932,9 @@ class QuantumForecast:
             .reset_index()
             .to_dict(orient="records"),
         }
-        with open(f"{self._safe_name}_quantum_forecast_output.json", "w") as f:
-            json.dump(output_data, f, indent=4, default=str)
+        self.output_data = output_data
+        # with open(f"{self._safe_name}_quantum_forecast_output.json", "w") as f:
+        #     json.dump(output_data, f, indent=4, default=str)
 
         # Error analysis
         df_error = df_sales_result.dropna(
@@ -935,17 +949,17 @@ class QuantumForecast:
         )
         print(
             "Original Forecast RMSE:",
-            root_mean_squared_error(df_error["SalesActual"], df_error["SalesForecast"]),
+            mean_squared_error(df_error["SalesActual"], df_error["SalesForecast"]),
         )
         print(
             "Random Forest Forecast RMSE:",
-            root_mean_squared_error(
+            mean_squared_error(
                 df_error["SalesActual"], df_error["RandomForest_Forecast"]
             ),
         )
         print(
             "Intuitive Forecast RMSE:",
-            root_mean_squared_error(
+            mean_squared_error(
                 df_error["SalesActual"], df_error["Intuitive_Forecast_Sales"]
             ),
         )
@@ -982,12 +996,12 @@ class QuantumForecast:
         plt.title(f"Forecast Error Comparison for {self.name}")
         plt.legend()
         plt.tight_layout()
-        plt.savefig(f"{self._safe_name}_forecast_error_comparison.png")
+        # plt.savefig(f"{self._safe_name}_forecast_error_comparison.png")
         plt.close()
 
-        self._log(
-            "Forecast generated -> quantum_forecast.csv & full_quantum_forecast_with_history.csv"
-        )
+        # self._log(
+        #     "Forecast generated -> quantum_forecast.csv & full_quantum_forecast_with_history.csv"
+        # )
 
         # Store for access
         self.df_sales = df_sales
@@ -1009,6 +1023,3 @@ if __name__ == "__main__":
         # forecast_end="2024-12-31",
     )
     q.run()
-
-    # 2) Run state based rostering
-    # TODO: implement state based rostering logic

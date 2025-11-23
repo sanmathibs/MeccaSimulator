@@ -1,0 +1,223 @@
+[
+  {
+    "id": "store_forecast:Castle Towers",
+    "text": "Store Castle Towers: 1099 trading days from 2022-10-23 to 2025-10-25. Total actual sales $45,066,802. MECCA forecast MAPE 14.8% on sales.",
+    "type": "forecast_store",
+    "store": "Castle Towers"
+  },
+  {
+    "id": "store_forecast:Double Bay",
+    "text": "Store Double Bay: 1093 trading days from 2022-10-29 to 2025-10-25. Total actual sales $22,069,125. MECCA forecast MAPE 29.1% on sales.",
+    "type": "forecast_store",
+    "store": "Double Bay"
+  },
+  {
+    "id": "store_forecast:Parramatta",
+    "text": "Store Parramatta: 1099 trading days from 2022-10-23 to 2025-10-25. Total actual sales $65,272,134. MECCA forecast MAPE 15.7% on sales.",
+    "type": "forecast_store",
+    "store": "Parramatta"
+  },
+  {
+    "id": "store_events:Castle Towers",
+    "text": "Store Castle Towers events vs BAU: event days contribute 14.2% of sales. MECCA MAPE 25.5% on event days and 13.8% on non-event days.",
+    "type": "events_store",
+    "store": "Castle Towers"
+  },
+  {
+    "id": "store_events:Double Bay",
+    "text": "Store Double Bay events vs BAU: event days contribute 8.5% of sales. MECCA MAPE 46.9% on event days and 28.1% on non-event days.",
+    "type": "events_store",
+    "store": "Double Bay"
+  },
+  {
+    "id": "store_events:Parramatta",
+    "text": "Store Parramatta events vs BAU: event days contribute 14.2% of sales. MECCA MAPE 26.7% on event days and 14.6% on non-event days.",
+    "type": "events_store",
+    "store": "Parramatta"
+  },
+  {
+    "id": "role_summary:#1 Host",
+    "text": "Role #1 Host: works 320.0 hours across 13 weeks (avg 24.6 hours per week) with total wages $11,448.",
+    "type": "roster_role",
+    "role": "#1 Host"
+  },
+  {
+    "id": "role_summary:#10 Host",
+    "text": "Role #10 Host: works 320.0 hours across 13 weeks (avg 24.6 hours per week) with total wages $10,044.",
+    "type": "roster_role",
+    "role": "#10 Host"
+  },
+  {
+    "id": "role_summary:#11 Host",
+    "text": "Role #11 Host: works 320.0 hours across 13 weeks (avg 24.6 hours per week) with total wages $10,044.",
+    "type": "roster_role",
+    "role": "#11 Host"
+  },
+  {
+    "id": "role_summary:#12 Host",
+    "text": "Role #12 Host: works 237.0 hours across 13 weeks (avg 18.2 hours per week) with total wages $7,803.",
+    "type": "roster_role",
+    "role": "#12 Host"
+  },
+  {
+    "id": "role_summary:#13 Host",
+    "text": "Role #13 Host: works 237.0 hours across 13 weeks (avg 18.2 hours per week) with total wages $7,803.",
+    "type": "roster_role",
+    "role": "#13 Host"
+  },
+  {
+    "id": "role_summary:#14 Host",
+    "text": "Role #14 Host: works 237.0 hours across 13 weeks (avg 18.2 hours per week) with total wages $7,803.",
+    "type": "roster_role",
+    "role": "#14 Host"
+  },
+  {
+    "id": "role_summary:#15 Host",
+    "text": "Role #15 Host: works 177.0 hours across 13 weeks (avg 13.6 hours per week) with total wages $7,601.",
+    "type": "roster_role",
+    "role": "#15 Host"
+  },
+  {
+    "id": "role_summary:#16 Host",
+    "text": "Role #16 Host: works 169.0 hours across 13 weeks (avg 13.0 hours per week) with total wages $7,252.",
+    "type": "roster_role",
+    "role": "#16 Host"
+  },
+  {
+    "id": "role_summary:#17 Host",
+    "text": "Role #17 Host: works 164.0 hours across 13 weeks (avg 12.6 hours per week) with total wages $6,970.",
+    "type": "roster_role",
+    "role": "#17 Host"
+  },
+  {
+    "id": "role_summary:#18 Host",
+    "text": "Role #18 Host: works 164.0 hours across 13 weeks (avg 12.6 hours per week) with total wages $6,173.",
+    "type": "roster_role",
+    "role": "#18 Host"
+  },
+  {
+    "id": "role_summary:#19 Host",
+    "text": "Role #19 Host: works 154.0 hours across 13 weeks (avg 11.8 hours per week) with total wages $6,256.",
+    "type": "roster_role",
+    "role": "#19 Host"
+  },
+  {
+    "id": "role_summary:#2 Host",
+    "text": "Role #2 Host: works 320.0 hours across 13 weeks (avg 24.6 hours per week) with total wages $11,448.",
+    "type": "roster_role",
+    "role": "#2 Host"
+  },
+  {
+    "id": "role_summary:#20 Host",
+    "text": "Role #20 Host: works 109.0 hours across 8 weeks (avg 13.6 hours per week) with total wages $4,265.",
+    "type": "roster_role",
+    "role": "#20 Host"
+  },
+  {
+    "id": "role_summary:#21 Host",
+    "text": "Role #21 Host: works 101.0 hours across 8 weeks (avg 12.6 hours per week) with total wages $4,331.",
+    "type": "roster_role",
+    "role": "#21 Host"
+  },
+  {
+    "id": "role_summary:#22 Host",
+    "text": "Role #22 Host: works 101.0 hours across 8 weeks (avg 12.6 hours per week) with total wages $4,763.",
+    "type": "roster_role",
+    "role": "#22 Host"
+  },
+  {
+    "id": "role_summary:#23 Host",
+    "text": "Role #23 Host: works 101.0 hours across 8 weeks (avg 12.6 hours per week) with total wages $4,680.",
+    "type": "roster_role",
+    "role": "#23 Host"
+  },
+  {
+    "id": "role_summary:#24 Host",
+    "text": "Role #24 Host: works 101.0 hours across 8 weeks (avg 12.6 hours per week) with total wages $4,447.",
+    "type": "roster_role",
+    "role": "#24 Host"
+  },
+  {
+    "id": "role_summary:#25 Host",
+    "text": "Role #25 Host: works 96.0 hours across 8 weeks (avg 12.0 hours per week) with total wages $4,016.",
+    "type": "roster_role",
+    "role": "#25 Host"
+  },
+  {
+    "id": "role_summary:#26 Host",
+    "text": "Role #26 Host: works 91.0 hours across 7 weeks (avg 13.0 hours per week) with total wages $3,684.",
+    "type": "roster_role",
+    "role": "#26 Host"
+  },
+  {
+    "id": "role_summary:#27 Host",
+    "text": "Role #27 Host: works 91.0 hours across 7 weeks (avg 13.0 hours per week) with total wages $3,684.",
+    "type": "roster_role",
+    "role": "#27 Host"
+  },
+  {
+    "id": "role_summary:#28 Host",
+    "text": "Role #28 Host: works 91.0 hours across 7 weeks (avg 13.0 hours per week) with total wages $3,684.",
+    "type": "roster_role",
+    "role": "#28 Host"
+  },
+  {
+    "id": "role_summary:#29 Host",
+    "text": "Role #29 Host: works 86.0 hours across 7 weeks (avg 12.3 hours per week) with total wages $3,253.",
+    "type": "roster_role",
+    "role": "#29 Host"
+  },
+  {
+    "id": "role_summary:#3 Host",
+    "text": "Role #3 Host: works 281.0 hours across 13 weeks (avg 21.6 hours per week) with total wages $10,395.",
+    "type": "roster_role",
+    "role": "#3 Host"
+  },
+  {
+    "id": "role_summary:#30 Host",
+    "text": "Role #30 Host: works 81.0 hours across 6 weeks (avg 13.5 hours per week) with total wages $2,854.",
+    "type": "roster_role",
+    "role": "#30 Host"
+  },
+  {
+    "id": "role_summary:#4 Host",
+    "text": "Role #4 Host: works 237.0 hours across 13 weeks (avg 18.2 hours per week) with total wages $9,207.",
+    "type": "roster_role",
+    "role": "#4 Host"
+  },
+  {
+    "id": "role_summary:#5 Host",
+    "text": "Role #5 Host: works 237.0 hours across 13 weeks (avg 18.2 hours per week) with total wages $9,207.",
+    "type": "roster_role",
+    "role": "#5 Host"
+  },
+  {
+    "id": "role_summary:#6 Host",
+    "text": "Role #6 Host: works 320.0 hours across 13 weeks (avg 24.6 hours per week) with total wages $11,448.",
+    "type": "roster_role",
+    "role": "#6 Host"
+  },
+  {
+    "id": "role_summary:#7 Host",
+    "text": "Role #7 Host: works 320.0 hours across 13 weeks (avg 24.6 hours per week) with total wages $11,448.",
+    "type": "roster_role",
+    "role": "#7 Host"
+  },
+  {
+    "id": "role_summary:#8 Host",
+    "text": "Role #8 Host: works 320.0 hours across 13 weeks (avg 24.6 hours per week) with total wages $10,044.",
+    "type": "roster_role",
+    "role": "#8 Host"
+  },
+  {
+    "id": "role_summary:#9 Host",
+    "text": "Role #9 Host: works 320.0 hours across 13 weeks (avg 24.6 hours per week) with total wages $10,044.",
+    "type": "roster_role",
+    "role": "#9 Host"
+  },
+  {
+    "id": "doc:overview",
+    "text": "High-level overview of the Mecca forecasting and rostering app: The Mecca simulator covers three main stores (Double Bay, Castle Towers, Parramatta). Forecast models include MECCA baseline, Intuitive, RandomForest and Hybrid. Key metrics: MAPE, MAE, sales per labour hour, total wages, event vs non-event performance, and weekend vs weekday trading patterns. Rostering views focus on hours per week and 12-week wages.",
+    "type": "doc"
+  }
+]

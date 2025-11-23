@@ -283,18 +283,18 @@ def plot_actual_vs_forecast(
         col1, col2 = st.columns(2)
         col1.plotly_chart(
             fig_a,
-            use_container_width=True,
+            width='stretch',
             key=f"line_actual_vs_forecast_{store_a_name}_A",
         )
         col2.plotly_chart(
             fig_b,
-            use_container_width=True,
+            width='stretch',
             key=f"line_actual_vs_forecast_{store_b_name}_B",
         )
     else:
         st.plotly_chart(
             fig_a,
-            use_container_width=True,
+            width='stretch',
             key=f"line_actual_vs_forecast_{store_a_name}_single",
         )
 
@@ -344,20 +344,20 @@ def plot_avg_sales_by_dow(
         if fig_a is not None:
             col1.plotly_chart(
                 fig_a,
-                use_container_width=True,
+                width='stretch',
                 key=f"dow_avg_{store_a_name}_A",
             )
         if fig_b is not None:
             col2.plotly_chart(
                 fig_b,
-                use_container_width=True,
+                width='stretch',
                 key=f"dow_avg_{store_b_name}_B",
             )
     else:
         if fig_a is not None:
             st.plotly_chart(
                 fig_a,
-                use_container_width=True,
+                width='stretch',
                 key=f"dow_avg_{store_a_name}_single",
             )
 
@@ -399,20 +399,20 @@ def plot_actual_vs_forecast_event(
         if fig_a is not None:
             col1.plotly_chart(
                 fig_a,
-                use_container_width=True,
+                width='stretch',
                 key=f"event_af_{store_a_name}_A",
             )
         if fig_b is not None:
             col2.plotly_chart(
                 fig_b,
-                use_container_width=True,
+                width='stretch',
                 key=f"event_af_{store_b_name}_B",
             )
     else:
         if fig_a is not None:
             st.plotly_chart(
                 fig_a,
-                use_container_width=True,
+                width='stretch',
                 key=f"event_af_{store_a_name}_single",
             )
 
@@ -490,7 +490,7 @@ def plot_sales_vs_hours_scatter(
     )
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width='stretch',
         key=f"scatter_sales_hours_{store_a_name}_{store_b_name or 'single'}",
     )
 

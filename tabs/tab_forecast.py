@@ -222,7 +222,7 @@ def make_error_timeseries(
 # -------------------------------------------------------------------
 
 def render():
-    st.header("Forecast lab")
+    st.header("Forecast Analysis")
 
     # --------------------------------------------------
     # Control bar with synced Period & Date range
@@ -345,10 +345,14 @@ def render():
     # choose primary model = best MAPE (lower is better)
     best_model = metrics_df["MAPE (%)"].idxmin()
     best_row = metrics_df.loc[best_model]
-    mecca_mape = metrics_df.loc["Mecca", "MAPE (%)"] if "Mecca" in metrics_df.index else np.nan
+    mecca_mape = (
+        metrics_df.loc["Mecca", "MAPE (%)"] if "Mecca" in metrics_df.index else np.nan
+    )
     best_imp = (
-        mecca_mape - best_row["MAPE (%)"]
-    ) / mecca_mape * 100 if "Mecca" in metrics_df.index and mecca_mape else 0.0
+        (mecca_mape - best_row["MAPE (%)"]) / mecca_mape * 100
+        if "Mecca" in metrics_df.index and mecca_mape
+        else 0.0
+    )
 
     st.markdown(
         f"""
@@ -471,7 +475,7 @@ def render():
             margin=dict(l=10, r=10, t=30, b=10),
             title="",
         )
-        st.plotly_chart(fig_sales, use_container_width=True)
+        st.plotly_chart(fig_sales, width='stretch')
     else:
         st.info("No data to display for sales chart.")
 
@@ -496,7 +500,7 @@ def render():
             margin=dict(l=10, r=10, t=30, b=10),
             title="",
         )
-        st.plotly_chart(fig_err, use_container_width=True)
+        st.plotly_chart(fig_err, width='stretch')
     else:
         st.info("No historical actuals to show error trend for this window.")
 
@@ -532,7 +536,7 @@ def render():
         margin=dict(l=10, r=10, t=30, b=10),
         title="",
     )
-    st.plotly_chart(fig_lab, use_container_width=True)
+    st.plotly_chart(fig_lab, width='stretch')
 
     st.markdown("---")
 
@@ -554,7 +558,7 @@ def render():
         xaxis_title="",
         margin=dict(l=10, r=10, t=30, b=10),
     )
-    st.plotly_chart(fig_mape, use_container_width=True)
+    st.plotly_chart(fig_mape, width='stretch')
 
     st.markdown(
         "**Note:** Positive values in 'Improvement vs Mecca (%)' indicate lower MAE than the MECCA forecast."
@@ -569,7 +573,7 @@ def render():
                 "Improvement vs Mecca (%)": "{:.1f}",
             }
         ),
-        use_container_width=True,
+        width='content',
     )
 
     # --------------------------------------------------

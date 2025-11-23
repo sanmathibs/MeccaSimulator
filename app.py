@@ -14,6 +14,7 @@ from tabs import (
     tab_rostering,
     tab_forecast,
     tab_event,
+    tab_forecast_lab,
 )
 
 
@@ -123,11 +124,12 @@ def main():
     )
 
     # Create tabs
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
         [
             "📊 Overview",
             "🏪 Store Explorer",
             "🔬 Forecast Lab",
+            "📈 Forecast Dashboard",
             "📋 Event & Seasonality",
             "👤 Rosters - Individual TM",
             "📅 Rosters - Weekly Coverage & Scheduling",
@@ -142,18 +144,21 @@ def main():
         tab_store.render()
 
     with tab3:
-        tab_forecast.render()
+        tab_forecast_lab.render()
 
     with tab4:
-        tab_event.render()
+        tab_forecast.render()
 
     with tab5:
-        tab_rostering.render()
+        tab_event.render()
 
     with tab6:
-        tab_roster_weekly.render()
+        tab_rostering.render()
 
     with tab7:
+        tab_roster_weekly.render()
+
+    with tab8:
         tab_ai_insight.render()
 
 

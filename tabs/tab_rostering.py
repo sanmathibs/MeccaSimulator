@@ -169,7 +169,7 @@ def render_filter_section(df: pd.DataFrame):
             "Weeks of year",
             min_value=min_week,
             max_value=max_week,
-            value=(default_start, default_end),  # 👈 last 12 weeks by default
+            value=(default_start, default_end),
             step=1,
         )
 
@@ -461,10 +461,10 @@ def render_roster_table(df_dashboard: pd.DataFrame):
                 "Wages": "${:,.2f}",
             }
         )
-        .applymap(style_shift_cell, subset=day_columns)
+        .map(style_shift_cell, subset=day_columns)
     )
 
-    st.dataframe(styler, use_container_width=True)
+    st.dataframe(styler, width='stretch')
 
 
 
@@ -519,7 +519,7 @@ def render_weekly_summary_chart(df_dashboard: pd.DataFrame):
         margin=dict(l=10, r=10, t=50, b=10),
     )
 
-    st.plotly_chart(fig, use_container_width=True, key="roster_weekly_combo")
+    st.plotly_chart(fig, width="stretch", key="roster_weekly_combo")
 
 
 # ---------------------------------------------------------

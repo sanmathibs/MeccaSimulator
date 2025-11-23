@@ -198,7 +198,7 @@ def render_improvement_gauge(metrics: dict, selected_model: str):
         font={"family": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"},
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 
@@ -587,7 +587,7 @@ def render_event_bar_chart(df_plot: pd.DataFrame, selected_model: str):
         title_x=0.5,
         margin=dict(l=10, r=10, t=50, b=10),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 def render_network_trend_chart(
@@ -668,7 +668,7 @@ def render_network_trend_chart(
         title_x=0.5,
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 def render_forecasting_insights(metrics: dict, selected_model: str):
@@ -847,7 +847,7 @@ def render_store_analysis(df_hist: pd.DataFrame, selected_model: str):
         title_x=0.5,
         margin=dict(l=10, r=10, t=50, b=10),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     # Store-wise summary table (still using MAPE & improvements)
     st.markdown("**Store-wise summary (MAPE and improvements vs MECCA)**")
@@ -867,7 +867,7 @@ def render_store_analysis(df_hist: pd.DataFrame, selected_model: str):
     df_show = df_stats[display_cols].copy()
     st.dataframe(
         df_show.style.format("{:.2f}", subset=df_show.columns.difference(["Store"])),
-        use_container_width=True,
+        width='content',
     )
 
     return df_stats
@@ -961,7 +961,7 @@ def render_store_detail(df_hist: pd.DataFrame, df_stats: pd.DataFrame):
                     "MAE": "{:,.0f}",
                 }
             ),
-            use_container_width=True,
+            width='content',
         )
 
     # Store-level Hybrid vs MECCA
