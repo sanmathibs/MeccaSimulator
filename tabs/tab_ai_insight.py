@@ -816,7 +816,7 @@ def render_review_intelligence():
             margin=dict(l=10, r=10, t=10, b=40),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
-        st.plotly_chart(fig_dist, width='content')
+        st.plotly_chart(fig_dist, width='stretch')
     else:
         st.info("No star ratings available to build a distribution.")
 

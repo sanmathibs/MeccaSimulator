@@ -1,6 +1,8 @@
 import json
+import shutil
 from datetime import datetime, date, timedelta
 from pathlib import Path
+from typing import Tuple, Dict, List
 
 import numpy as np
 import pandas as pd
@@ -14,14 +16,15 @@ from model.state_based_rostering import QuantumForecast
 # CONFIG
 # -------------------------------------------------------------------
 
-STORE_MAP_INPUTS = {
+STORE_MAP_INPUTS: Dict[str, str] = {
     "Castle Towers": "Mecca Castle Towers",
     "Double Bay": "Mecca Double Bay",
     "Parramatta": "Mecca Parramatta",
 }
 
 FORECAST_DATA_FOLDER = "data/forecast/"
-FORECAST_DATA_FILE_NAMES = {
+
+FORECAST_DATA_FILE_NAMES: Dict[str, str] = {
     "Castle Towers": "Castle_Towers.json",
     "Double Bay": "Double_Bay.json",
     "Parramatta": "Parramatta.json",
@@ -34,6 +37,9 @@ FORECAST_INPUT_REQUIRED_COLUMNS = [
     "HoursActual",
     "HoursForecast",
 ]
+
+DYNAMIC_PREFIX = "dynamic_"  # prefix for dynamic run files
+BACKUP_SUFFIX = "__original_backup"  # suffix for original baseline backup
 
 
 # -------------------------------------------------------------------
@@ -66,16 +72,40 @@ def _info_card(title: str, value: str, subtitle: str = "") -> str:
     """
 
 
-def save_forecast_output(store_name: str, output_data: dict, postfix: str = "") -> Path:
+def _baseline_and_backup_paths(store_name: str) -> Tuple[Path, Path]:
+    """Return baseline JSON path and its backup path for a store."""
+    baseline_name = FORECAST_DATA_FILE_NAMES[store_name]
+    baseline_file = Path(FORECAST_DATA_FOLDER) / baseline_name
+    backup_file = baseline_file.with_name(baseline_file.stem + BACKUP_SUFFIX + ".json")
+    return baseline_file, backup_file
+
+
+def _list_dynamic_runs(store_name: str) -> List[Path]:
+    """List dynamic-run JSON files for a store."""
+    baseline_name = FORECAST_DATA_FILE_NAMES[store_name]
+    stem = Path(baseline_name).stem
+    folder = Path(FORECAST_DATA_FOLDER)
+    if not folder.exists():
+        return []
+    pattern = f"{stem}_{DYNAMIC_PREFIX}*.json"
+    return sorted(folder.glob(pattern))
+
+
+def save_forecast_output(store_name: str, output_data: dict, postfix: str) -> Path:
     """
-    Save forecast output to the designated JSON file, keeping your existing
-    naming convention compatible with other tabs.
+    Save forecast output to a JSON file.
+
+    NOTE:
+    - We ALWAYS pass a postfix for dynamic runs in this tab so we never overwrite
+      the baseline JSON (<Store>.json).
+    - Other parts of the app (e.g. the initial/baseline pipeline) can still call
+      this with an empty postfix if they explicitly want to overwrite the baseline.
     """
     file_name = FORECAST_DATA_FILE_NAMES[store_name]
     if postfix:
         file_name = file_name.replace(".json", f"_{postfix}.json")
-    output_path = Path(FORECAST_DATA_FOLDER, file_name)
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    output_path = Path(FORECAST_DATA_FOLDER) / file_name
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, "w") as f:
         json.dump(output_data, f, indent=4, default=str)
@@ -143,7 +173,7 @@ def run_quantum_forecast_cached(
     return qf.output_data
 
 
-def _compute_default_horizon(df_store: pd.DataFrame, weeks_forward: int = 8) -> tuple[date, date]:
+def _compute_default_horizon(df_store: pd.DataFrame, weeks_forward: int = 8) -> Tuple[date, date]:
     """
     Default: forecast starts the day after last actual and runs N weeks.
     """
@@ -153,7 +183,9 @@ def _compute_default_horizon(df_store: pd.DataFrame, weeks_forward: int = 8) -> 
     return start, end
 
 
-def _prepare_forecast_frames(output_data: dict, start: date, end: date) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _prepare_forecast_frames(
+    output_data: dict, start: date, end: date
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     From QuantumForecast output JSON, return:
     - df_full: full history + forecast as DataFrame
@@ -165,7 +197,9 @@ def _prepare_forecast_frames(output_data: dict, start: date, end: date) -> tuple
     forecast_start = pd.to_datetime(start)
     forecast_end = pd.to_datetime(end)
 
-    df_future = df_full[(df_full["Date"] >= forecast_start) & (df_full["Date"] <= forecast_end)].copy()
+    df_future = df_full[
+        (df_full["Date"] >= forecast_start) & (df_full["Date"] <= forecast_end)
+    ].copy()
 
     # Tail history for chart (12 weeks back)
     tail_start = forecast_start - timedelta(weeks=12)
@@ -274,9 +308,11 @@ def render():
     # Compute default start/end based on preset
     default_start, default_end = _compute_default_horizon(
         df_store,
-        weeks_forward={"Next 4 weeks": 4, "Next 8 weeks": 8, "Next 12 weeks": 12}.get(
-            preset, 8
-        ),
+        weeks_forward={
+            "Next 4 weeks": 4,
+            "Next 8 weeks": 8,
+            "Next 12 weeks": 12,
+        }.get(preset, 8),
     )
 
     with col_dates:
@@ -330,7 +366,7 @@ def render():
         save_output = st.checkbox(
             "Save this run to JSON",
             value=True,
-            help="Saves under data/forecast/… so other tabs can re-use it.",
+            help="Saves under data/forecast/… as a separate dynamic file.",
         )
 
     # Safety check
@@ -351,7 +387,12 @@ def render():
     run_col1, run_col2, _ = st.columns([1.2, 1.2, 2.0])
 
     with run_col1:
-        run_clicked = st.button("🚀 Run forecast", type="primary", width='stretch')
+        run_clicked = st.button(
+            "🚀 Run forecast",
+            type="primary",
+            width='stretch',
+            key=f"run_forecast_btn_{store_name}",
+        )
 
     with run_col2:
         st.caption(
@@ -412,8 +453,15 @@ def render():
             # Optionally save to JSON (with a descriptive postfix)
             saved_path = None
             if save_output:
-                postfix = f"{forecast_start_str}_to_{forecast_end_str}".replace("-", "")
-                saved_path = save_forecast_output(store_name, output_data, postfix=postfix)
+                postfix = (
+                    f"{DYNAMIC_PREFIX}{forecast_start_str}_to_{forecast_end_str}"
+                    .replace("-", "")
+                )
+                saved_path = save_forecast_output(
+                    store_name,
+                    output_data,
+                    postfix=postfix,
+                )
 
             # Attach to session_state for easy reuse in this session
             st.session_state.setdefault("live_forecast_runs", {})
@@ -518,7 +566,6 @@ def render():
             "Intuitive_Forecast_Sales",
             "RandomForest_Forecast",
         ]
-        # Some columns only exist in the future block; be defensive
         snippet_cols = [c for c in snippet_cols if c in df_future.columns]
 
         df_snippet = df_future.copy()
@@ -568,7 +615,7 @@ def render():
             markers=False,
         )
 
-        # --- Draw "Forecast start" as a vertical scatter line instead of add_vline ---
+        # Draw "Forecast start" as a vertical scatter line
         y_min = df_chart["Value"].min()
         y_max = df_chart["Value"].max()
 
@@ -601,6 +648,98 @@ def render():
         )
 
     # --------------------------------------------------
+    # Baseline management: apply / reset
+    # --------------------------------------------------
+    st.markdown("---")
+    st.subheader("3️⃣ Baseline management (optional)")
+
+    baseline_file, backup_file = _baseline_and_backup_paths(store_name)
+    dynamic_runs = _list_dynamic_runs(store_name)
+
+    st.markdown(
+        f"**Active baseline file:** `{baseline_file}`  "
+        f"<br>**Original backup:** "
+        f"`{backup_file.name}` {'(exists)' if backup_file.exists() else '(not created yet)' }",
+        unsafe_allow_html=True,
+    )
+
+    if dynamic_runs:
+        st.markdown("**Saved dynamic runs for this store:**")
+        for p in dynamic_runs:
+            marker = ""
+            if run_state.get("saved_path") and Path(run_state["saved_path"]).name == p.name:
+                marker = " ← current run"
+            st.markdown(f"- `{p.name}`{marker}")
+    else:
+        st.markdown("_No dynamic runs have been saved for this store yet._")
+
+    col_apply, col_reset = st.columns(2)
+
+    with col_apply:
+        apply_clicked = st.button(
+            "✅ Apply current run as active baseline",
+            help=(
+                "Copy the JSON for this dynamic run over the baseline JSON for this store. "
+                "Other tabs that read the forecast JSON will then use this run."
+            ),
+            key=f"apply_baseline_{store_name}",
+        )
+
+    with col_reset:
+        reset_clicked = st.button(
+            "🔁 Reset baseline to original",
+            help=(
+                "Restore the original baseline JSON from backup "
+                "(if a backup has been created)."
+            ),
+            key=f"reset_baseline_{store_name}",
+        )
+
+    # --- Apply current run as baseline ---
+    if apply_clicked:
+        saved_path = run_state.get("saved_path")
+        if not saved_path:
+            st.error(
+                "This run has not been saved to disk. Tick 'Save this run to JSON' "
+                "before applying it as baseline."
+            )
+        else:
+            dyn_path = Path(saved_path)
+            if not dyn_path.exists():
+                st.error(f"Saved run file not found: {dyn_path}")
+            else:
+                try:
+                    # On first overwrite, capture original baseline into a backup
+                    if baseline_file.exists() and not backup_file.exists():
+                        shutil.copy2(baseline_file, backup_file)
+
+                    shutil.copy2(dyn_path, baseline_file)
+                    st.success(
+                        f"Baseline for {store_name} updated from `{dyn_path.name}`.\n\n"
+                        "Overview / scenario tabs that read this JSON will now "
+                        "use the updated baseline after their caches refresh."
+                    )
+                except Exception as e:
+                    st.error(f"Failed to update baseline: {e}")
+
+    # --- Reset baseline to original ---
+    if reset_clicked:
+        if not backup_file.exists():
+            st.warning(
+                f"No original backup file found at `{backup_file}`. "
+                "Baseline cannot be reset."
+            )
+        else:
+            try:
+                shutil.copy2(backup_file, baseline_file)
+                st.success(
+                    f"Baseline for {store_name} reset to original backup "
+                    f"`{backup_file.name}`."
+                )
+            except Exception as e:
+                st.error(f"Failed to reset baseline: {e}")
+
+    # --------------------------------------------------
     # Metadata & debug info
     # --------------------------------------------------
     with st.expander("⚙️ Run details & debug info"):
@@ -608,7 +747,7 @@ def render():
         st.json(run_state["params"])
 
         if run_state.get("saved_path"):
-            st.write("**Saved to JSON**")
+            st.write("**Dynamic run saved at**")
             st.code(run_state["saved_path"])
         else:
             st.write("This run was not saved to disk.")
