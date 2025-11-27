@@ -257,11 +257,6 @@ class Predict:
         print(feature_importance_df)
 
         # replace sales forecast for shutdown events
-        # -- debug check index of df_sales where Is_Shutdown == 1
-        print(
-            "Indices where Is_Shutdown == 1:",
-            df_sales[df_sales["Is_Shutdown"] == 1].index.tolist(),
-        )
         historial_pred[df_sales[df_sales["Is_Shutdown"] == 1].index] = 0
         print(
             "Historical forecast RMSE:",
@@ -280,7 +275,7 @@ class Predict:
         y_val = y.iloc[val_indices]
         y_val_pred = rf.predict(X_val)
 
-        rmse = mean_squared_error(y_val, y_val_pred)
+        rmse = mean_squared_error(y_val, y_val_pred) ** 0.5
         mae = np.mean(np.abs(y_val - y_val_pred))
         avg_actual = np.mean(y_val)
         rel_rmse = rmse / avg_actual * 100
@@ -417,6 +412,10 @@ class QuantumForecast:
             self.forecast_end = pd.to_datetime(forecast_end)
         except:
             pass
+        # intput_df.to_csv(
+        #     f"debug_input_df_{forecast_start.date()}_{forecast_end.date()}.csv",
+        #     index=False,
+        # )
         self.smooth_slope_digits = smooth_slope_digits
         self.blend_weight = blend_weight
         self.verbose = verbose
@@ -578,7 +577,7 @@ class QuantumForecast:
         return df_sales, event_class
 
     def _three_factor(self, df_sales: pd.DataFrame) -> tuple[Dict, Dict, Dict]:
-        df_normal = df_sales[df_sales["EventName"] != "Unclassified"].copy()
+        df_normal = df_sales[df_sales["EventName"] == "Unclassified"].copy()
         annual_factor = df_normal.groupby("Year")["SalesActual"].mean().to_dict()
         woy_mean = df_normal.groupby("WoY")["SalesActual"].mean()
         woy_factor = (woy_mean / df_normal["SalesActual"].mean()).to_dict()

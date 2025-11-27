@@ -9,6 +9,7 @@ import numpy as np
 
 # ---------- DATA LOADING ----------
 
+
 @st.cache_data(show_spinner=False)
 def load_forecast_data():
     """Load JSON forecast files for all stores and return a combined DataFrame."""
@@ -20,12 +21,20 @@ def load_forecast_data():
 
     dfs = []
     numeric_cols = [
-        "SalesActual", "SalesForecast", "HoursActual", "HoursForecast",
-        "TF_Forecast_RawSales", "TF_Forecast_Sales",
-        "SE_Forecast_State", "SE_Forecast_Sales",
-        "Intuitive_Forecast_Sales", "RandomForest_Forecast",
-        "Hybrid_Forecast_Sales", "Hybrid_State",
-        "Hybrid_Sales_Rounded", "Hybrid_Forecast_Labour",
+        "SalesActual",
+        "SalesForecast",
+        "HoursActual",
+        "HoursForecast",
+        "TF_Forecast_RawSales",
+        "TF_Forecast_Sales",
+        "SE_Forecast_State",
+        "SE_Forecast_Sales",
+        "Intuitive_Forecast_Sales",
+        "RandomForest_Forecast",
+        "Hybrid_Forecast_Sales",
+        "Hybrid_State",
+        "Hybrid_Sales_Rounded",
+        "Hybrid_Forecast_Labour",
     ]
 
     for store_name, file_path in DATA_FILE.items():
@@ -76,6 +85,7 @@ def _apply_scenario_filter(df: pd.DataFrame, scenario: str) -> pd.DataFrame:
         return df[(df["Year"] == 2025) & (df["WoY"].between(41, 53))]
 
     return df
+
 
 def render_selection_pills(
     selected_stores,
@@ -160,6 +170,7 @@ def render_selection_pills(
     """
     st.markdown(html, unsafe_allow_html=True)
 
+
 def render_improvement_gauge(metrics: dict, selected_model: str):
     """Circular gauge showing error improvement vs MECCA."""
     if metrics is None or selected_model == "Mecca":
@@ -195,14 +206,16 @@ def render_improvement_gauge(metrics: dict, selected_model: str):
         height=180,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font={"family": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"},
+        font={
+            "family": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        },
     )
 
-    st.plotly_chart(fig, width='stretch')
-
+    st.plotly_chart(fig, width="stretch")
 
 
 # ---------- SMALL HELPERS ----------
+
 
 def _accuracy_from_mape(mape_value: float) -> float:
     """Convert a MAPE value to a 0–100% accuracy score, clipped at 0."""
@@ -221,6 +234,7 @@ def _format_event_share(pct: float) -> str:
 
 
 # ---------- FILTER BAR ----------
+
 
 def render_global_filters(df: pd.DataFrame):
     """Render filters and return the filtered dataframe + selections."""
@@ -261,9 +275,7 @@ def render_global_filters(df: pd.DataFrame):
     # Model selector
     with col3:
         model_options = ["Mecca", "Intuitive", "RandomForest", "Hybrid"]
-        selected_model = st.selectbox(
-            "Forecast model", options=model_options, index=3
-        )
+        selected_model = st.selectbox("Forecast model", options=model_options, index=3)
 
     # Scenario selector
     with col4:
@@ -296,9 +308,8 @@ def render_global_filters(df: pd.DataFrame):
         df_filtered = df_filtered[df_filtered["Store"].isin(selected_stores)]
 
     df_filtered = df_filtered[
-        (df_filtered["Date"] >= start_date)
-        & (df_filtered["Date"] <= end_date)
-        ]
+        (df_filtered["Date"] >= start_date) & (df_filtered["Date"] <= end_date)
+    ]
 
     df_filtered = _apply_scenario_filter(df_filtered, selected_scenario)
 
@@ -311,10 +322,18 @@ def render_global_filters(df: pd.DataFrame):
     }
     df_filtered["Forecast_Selected_Model"] = df_filtered[model_col_map[selected_model]]
 
-    return df_filtered, selected_stores, selected_model, selected_scenario, start_date, end_date
+    return (
+        df_filtered,
+        selected_stores,
+        selected_model,
+        selected_scenario,
+        start_date,
+        end_date,
+    )
 
 
 # ---------- METRICS & IMPACT ----------
+
 
 def compute_overview_metrics(df_filtered: pd.DataFrame, selected_model: str):
     df_hist = df_filtered[df_filtered["SalesActual"].notna()].copy()
@@ -328,13 +347,8 @@ def compute_overview_metrics(df_filtered: pd.DataFrame, selected_model: str):
 
     abs_err_model = (df_hist["SalesActual"] - df_hist["Forecast_Selected_Model"]).abs()
     mae_model = abs_err_model.mean()
-    rmse = np.sqrt((abs_err_model ** 2).mean())
-    mape = (
-            abs_err_model
-            .div(df_hist["SalesActual"].replace(0, np.nan))
-            .mean()
-            * 100
-    )
+    rmse = np.sqrt((abs_err_model**2).mean())
+    mape = abs_err_model.div(df_hist["SalesActual"].replace(0, np.nan)).mean() * 100
 
     abs_err_mecca = (df_hist["SalesActual"] - df_hist["SalesForecast"]).abs()
     mae_mecca = abs_err_mecca.mean()
@@ -425,15 +439,15 @@ def render_kpi_cards(metrics: dict, selected_model: str):
                 "border": "#e0e0e0",
             },
             "good": {
-                "bg": "#e8f5e9",   # soft green
+                "bg": "#e8f5e9",  # soft green
                 "border": "#c8e6c9",
             },
             "warn": {
-                "bg": "#fff8e1",   # soft amber
+                "bg": "#fff8e1",  # soft amber
                 "border": "#ffe0b2",
             },
             "bad": {
-                "bg": "#ffebee",   # soft red
+                "bg": "#ffebee",  # soft red
                 "border": "#ffcdd2",
             },
         }
@@ -489,11 +503,11 @@ def render_kpi_cards(metrics: dict, selected_model: str):
         if improvement_pct >= 10:
             improvement_tone = "good"
         elif improvement_pct >= 0:
-            improvement_tone = "warn"   # small improvement
+            improvement_tone = "warn"  # small improvement
         elif improvement_pct <= -10:
             improvement_tone = "bad"
         else:
-            improvement_tone = "warn"   # slight deterioration
+            improvement_tone = "warn"  # slight deterioration
 
     # For now, keep sales / hours cards neutral (they’re descriptive, not good/bad)
     neutral_tone = "neutral"
@@ -544,7 +558,9 @@ def render_kpi_cards(metrics: dict, selected_model: str):
             tone=improvement_tone,
         )
 
+
 # ---------- HERO CHART ----------
+
 
 def render_event_bar_chart(df_plot: pd.DataFrame, selected_model: str):
     """For special-event scenarios: per-store total sales vs forecast."""
@@ -587,14 +603,14 @@ def render_event_bar_chart(df_plot: pd.DataFrame, selected_model: str):
         title_x=0.5,
         margin=dict(l=10, r=10, t=50, b=10),
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_network_trend_chart(
-        df_filtered: pd.DataFrame,
-        selected_model: str,
-        selected_stores,
-        scenario_focus: str,
+    df_filtered: pd.DataFrame,
+    selected_model: str,
+    selected_stores,
+    scenario_focus: str,
 ):
     """
     Hero chart:
@@ -668,7 +684,7 @@ def render_network_trend_chart(
         title_x=0.5,
     )
 
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_forecasting_insights(metrics: dict, selected_model: str):
@@ -721,6 +737,7 @@ def render_forecasting_insights(metrics: dict, selected_model: str):
 
 # ---------- STORE-WISE ANALYSIS ----------
 
+
 def compute_store_stats(df_hist: pd.DataFrame, selected_model: str) -> pd.DataFrame:
     """Per-store MAPE, accuracy and improvements vs MECCA."""
     rows = []
@@ -739,17 +756,9 @@ def compute_store_stats(df_hist: pd.DataFrame, selected_model: str) -> pd.DataFr
         abs_err_mecca = (d["SalesActual"] - d["SalesForecast"]).abs()
         abs_err_hybrid = (d["SalesActual"] - d["Hybrid_Forecast_Sales"]).abs()
 
-        mape_mecca = (
-                abs_err_mecca
-                .div(d["SalesActual"].replace(0, np.nan))
-                .mean()
-                * 100
-        )
+        mape_mecca = abs_err_mecca.div(d["SalesActual"].replace(0, np.nan)).mean() * 100
         mape_hybrid = (
-                abs_err_hybrid
-                .div(d["SalesActual"].replace(0, np.nan))
-                .mean()
-                * 100
+            abs_err_hybrid.div(d["SalesActual"].replace(0, np.nan)).mean() * 100
         )
         imp_hybrid = (
             (mape_mecca - mape_hybrid) / mape_mecca * 100 if mape_mecca else 0.0
@@ -766,15 +775,8 @@ def compute_store_stats(df_hist: pd.DataFrame, selected_model: str) -> pd.DataFr
 
         if selected_model not in ["Hybrid", "Mecca"]:
             abs_err_sel = (d["SalesActual"] - d[sel_col_map[selected_model]]).abs()
-            mape_sel = (
-                    abs_err_sel
-                    .div(d["SalesActual"].replace(0, np.nan))
-                    .mean()
-                    * 100
-            )
-            imp_sel = (
-                (mape_mecca - mape_sel) / mape_mecca * 100 if mape_mecca else 0.0
-            )
+            mape_sel = abs_err_sel.div(d["SalesActual"].replace(0, np.nan)).mean() * 100
+            imp_sel = (mape_mecca - mape_sel) / mape_mecca * 100 if mape_mecca else 0.0
 
             row[f"{selected_model} MAPE (Error %)"] = mape_sel
             row[f"{selected_model} Accuracy %"] = _accuracy_from_mape(mape_sel)
@@ -847,7 +849,7 @@ def render_store_analysis(df_hist: pd.DataFrame, selected_model: str):
         title_x=0.5,
         margin=dict(l=10, r=10, t=50, b=10),
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
     # Store-wise summary table (still using MAPE & improvements)
     st.markdown("**Store-wise summary (MAPE and improvements vs MECCA)**")
@@ -867,13 +869,14 @@ def render_store_analysis(df_hist: pd.DataFrame, selected_model: str):
     df_show = df_stats[display_cols].copy()
     st.dataframe(
         df_show.style.format("{:.2f}", subset=df_show.columns.difference(["Store"])),
-        width='content',
+        width="content",
     )
 
     return df_stats
 
 
 # ---------- STORE DETAIL ANALYSIS ----------
+
 
 def render_store_detail(df_hist: pd.DataFrame, df_stats: pd.DataFrame):
     """Detailed analysis for a single store (default Parramatta)."""
@@ -902,9 +905,9 @@ def render_store_detail(df_hist: pd.DataFrame, df_stats: pd.DataFrame):
 
     # Summary table for this store
     summary_rows = [
-        ["Store", store_sel],
-        ["Days with actuals", n_days],
-        ["Event days", n_event_days],
+        ["Store", str(store_sel)],
+        ["Days with actuals", str(n_days)],
+        ["Event days", str(n_event_days)],
         ["Total actual sales", f"${total_sales:,.0f}"],
         ["Total labour hours", f"{total_hours:,.0f}"],
         [
@@ -929,12 +932,7 @@ def render_store_detail(df_hist: pd.DataFrame, df_stats: pd.DataFrame):
     for model_name, col in model_cols.items():
         abs_err = (d["SalesActual"] - d[col]).abs()
         mae = abs_err.mean()
-        mape = (
-                abs_err
-                .div(d["SalesActual"].replace(0, np.nan))
-                .mean()
-                * 100
-        )
+        mape = abs_err.div(d["SalesActual"].replace(0, np.nan)).mean() * 100
         total_forecast = d[col].sum()
         perf_rows.append(
             {
@@ -961,7 +959,7 @@ def render_store_detail(df_hist: pd.DataFrame, df_stats: pd.DataFrame):
                     "MAE": "{:,.0f}",
                 }
             ),
-            width='content',
+            width="content",
         )
 
     # Store-level Hybrid vs MECCA
@@ -978,21 +976,14 @@ def render_store_detail(df_hist: pd.DataFrame, df_stats: pd.DataFrame):
         if df_local.empty:
             return np.nan
         abs_err = (df_local["SalesActual"] - df_local[col]).abs()
-        return (
-                abs_err
-                .div(df_local["SalesActual"].replace(0, np.nan))
-                .mean()
-                * 100
-        )
+        return abs_err.div(df_local["SalesActual"].replace(0, np.nan)).mean() * 100
 
     mape_mecca_event = mape_for(d_events, "SalesForecast")
     mape_hybrid_event = mape_for(d_events, "Hybrid_Forecast_Sales")
     mape_mecca_non = mape_for(d_non, "SalesForecast")
     mape_hybrid_non = mape_for(d_non, "Hybrid_Forecast_Sales")
 
-    has_event_mape = not (
-            np.isnan(mape_mecca_event) or np.isnan(mape_hybrid_event)
-    )
+    has_event_mape = not (np.isnan(mape_mecca_event) or np.isnan(mape_hybrid_event))
     event_share_text = _format_event_share(event_share)
 
     # Build the 3rd bullet depending on how meaningful event days are
@@ -1055,6 +1046,7 @@ def render_store_detail(df_hist: pd.DataFrame, df_stats: pd.DataFrame):
 
 # ---------- ENTRY POINT ----------
 
+
 def render():
     df = load_forecast_data()
     (
@@ -1095,7 +1087,9 @@ def render():
 
     if metrics is not None:
         # Store-wise section in an expander
-        with st.expander("Store-wise forecast accuracy & model comparison", expanded=True):
+        with st.expander(
+            "Store-wise forecast accuracy & model comparison", expanded=True
+        ):
             df_stats = render_store_analysis(metrics["df_hist"], model)
 
         st.markdown("---")
@@ -1103,4 +1097,3 @@ def render():
         # Store detail drill-down in a separate expander
         with st.expander("Store detail drill-down", expanded=False):
             render_store_detail(metrics["df_hist"], df_stats)
-

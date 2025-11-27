@@ -14,6 +14,7 @@ from . import (
     tab_forecast,
     tab_event,
     tab_ai_insight,
+    tab_reforecast,
 )
 
 
@@ -25,4 +26,5 @@ __all__ = [
     "tab_forecast",
     "tab_roster_weekly",
     "tab_ai_insight",
+    "tab_reforecast",
 ]

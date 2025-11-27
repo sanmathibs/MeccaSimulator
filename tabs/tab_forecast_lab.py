@@ -46,6 +46,7 @@ BACKUP_SUFFIX = "__original_backup"  # suffix for original baseline backup
 # SMALL HELPERS
 # -------------------------------------------------------------------
 
+
 def _info_card(title: str, value: str, subtitle: str = "") -> str:
     """Simple, elegant KPI card HTML."""
     return f"""
@@ -173,7 +174,9 @@ def run_quantum_forecast_cached(
     return qf.output_data
 
 
-def _compute_default_horizon(df_store: pd.DataFrame, weeks_forward: int = 8) -> Tuple[date, date]:
+def _compute_default_horizon(
+    df_store: pd.DataFrame, weeks_forward: int = 8
+) -> Tuple[date, date]:
     """
     Default: forecast starts the day after last actual and runs N weeks.
     """
@@ -248,8 +251,9 @@ def _simple_future_kpis(df_future: pd.DataFrame) -> dict:
 # MAIN RENDER
 # -------------------------------------------------------------------
 
+
 def render():
-    st.header("⚡ Live Dynamic Forecast Lab")
+    st.header("⚡ Live Forecast Lab")
 
     # --------------------------------------------------
     # Store selection + history context
@@ -390,7 +394,7 @@ def render():
         run_clicked = st.button(
             "🚀 Run forecast",
             type="primary",
-            width='stretch',
+            width="stretch",
             key=f"run_forecast_btn_{store_name}",
         )
 
@@ -453,9 +457,8 @@ def render():
             # Optionally save to JSON (with a descriptive postfix)
             saved_path = None
             if save_output:
-                postfix = (
-                    f"{DYNAMIC_PREFIX}{forecast_start_str}_to_{forecast_end_str}"
-                    .replace("-", "")
+                postfix = f"{DYNAMIC_PREFIX}{forecast_start_str}_to_{forecast_end_str}".replace(
+                    "-", ""
                 )
                 saved_path = save_forecast_output(
                     store_name,
@@ -538,9 +541,7 @@ def render():
             unsafe_allow_html=True,
         )
     with c4:
-        peak_sub = (
-            f"Peak day: {kpis['peak_date']:%d %b}" if kpis["peak_date"] else "—"
-        )
+        peak_sub = f"Peak day: {kpis['peak_date']:%d %b}" if kpis["peak_date"] else "—"
         st.markdown(
             _info_card(
                 "Avg daily sales",
@@ -572,7 +573,7 @@ def render():
         df_snippet["Date"] = df_snippet["Date"].dt.date
         df_snippet = df_snippet[snippet_cols].head(21)
 
-        st.dataframe(df_snippet, width='stretch')
+        st.dataframe(df_snippet, width="stretch")
 
         # Download as CSV
         csv_bytes = df_future[snippet_cols].to_csv(index=False).encode("utf-8")
@@ -639,7 +640,7 @@ def render():
 
         fig.update_layout(legend_title_text="")
 
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, width="stretch")
 
     else:
         st.info(
@@ -667,7 +668,10 @@ def render():
         st.markdown("**Saved dynamic runs for this store:**")
         for p in dynamic_runs:
             marker = ""
-            if run_state.get("saved_path") and Path(run_state["saved_path"]).name == p.name:
+            if (
+                run_state.get("saved_path")
+                and Path(run_state["saved_path"]).name == p.name
+            ):
                 marker = " ← current run"
             st.markdown(f"- `{p.name}`{marker}")
     else:
